@@ -1,0 +1,12 @@
+package ma.tifawin.x0.common.enums;
+
+public enum Role {
+    CITOYEN,
+    MEDIATEUR,
+    AGENT_RECLAMATION,
+    AGENT_VALIDATION,
+    AGENT_CERTIFICATION,
+    AGENT_SIGNATURE,
+    ADMINISTRATEUR,
+    RESPONSABLE_SERVICE
+}
