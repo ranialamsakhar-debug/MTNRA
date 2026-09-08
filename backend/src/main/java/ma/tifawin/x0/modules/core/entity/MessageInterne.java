@@ -29,8 +29,12 @@ public class MessageInterne {
     private Agent expediteur;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "destinataire_id", nullable = false)
+    @JoinColumn(name = "destinataire_id")
     private Agent destinataire;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "canal_id")
+    private CanalChat canal;
 
     @Column(nullable = false)
     private Boolean lu = false;

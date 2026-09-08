@@ -9,5 +9,7 @@ public enum DossierStatut {
     EN_SIGNATURE,
     CLOTURE,
     REJETE,
-    ANNULE
+    ANNULE,
+    EN_LITIGE,
+    REJETE_DEFINITIF
 }

@@ -1,0 +1,46 @@
+{
+  "stats": {
+    "totalDossiers": 36,
+    "dossiersEnAttente": 6,
+    "dossiersTraites": 28,
+    "tauxSatisfaction": 96
+  },
+  "recentDossiers": [
+    {
+      "id": "DOS-2026-89421",
+      "type": "Fonds de commerce",
+      "citoyen": "Amina B.",
+      "date": "28 Oct 2026",
+      "status": "En cours"
+    },
+    {
+      "id": "DOS-2026-89422",
+      "type": "Réclamation",
+      "citoyen": "Karim E.",
+      "date": "28 Oct 2026",
+      "status": "Nouveau"
+    },
+    {
+      "id": "DOS-2026-89410",
+      "type": "Demande de subvention",
+      "citoyen": "Hassan T.",
+      "date": "27 Oct 2026",
+      "status": "Validé"
+    },
+    {
+      "id": "DOS-2026-89405",
+      "type": "Médiation",
+      "citoyen": "Nadia R.",
+      "date": "26 Oct 2026",
+      "status": "En cours"
+    }
+  ],
+  "performance": [
+    { "mois": "Jan", "traites": 3 },
+    { "mois": "Fev", "traites": 4 },
+    { "mois": "Mar", "traites": 5 },
+    { "mois": "Avr", "traites": 5 },
+    { "mois": "Mai", "traites": 6 },
+    { "mois": "Juin", "traites": 8 }
+  ]
+}
