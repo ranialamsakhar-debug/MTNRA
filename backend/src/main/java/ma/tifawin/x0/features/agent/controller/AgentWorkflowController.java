@@ -61,6 +61,14 @@ public class AgentWorkflowController {
         return ResponseEntity.ok(agentWorkflowService.cloturerDossier(dossierId, commentaire));
     }
 
+    @PostMapping("/dossiers/{dossierId}/signer")
+    public ResponseEntity<Dossier> signerDossier(
+            @PathVariable Long dossierId,
+            @RequestParam Long agentSignatureId,
+            @RequestParam String imageSignature) {
+        return ResponseEntity.ok(agentWorkflowService.signerDossier(dossierId, agentSignatureId, imageSignature));
+    }
+
     // ── Rejeter le dossier ──
 
     @PostMapping("/dossiers/{dossierId}/rejeter")

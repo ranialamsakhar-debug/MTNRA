@@ -29,4 +29,8 @@ public abstract class Signature {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "citoyen_id", nullable = false)
     private Citoyen citoyen;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "agent_signature_id", nullable = false)
+    private AgentSignature agentSignature;
 }

@@ -10,6 +10,7 @@ interface Actualite {
   date: string;
   categorie: string;
   image?: string;
+  url?: string;
 }
 
 const FALLBACK_DATA: Actualite[] = [

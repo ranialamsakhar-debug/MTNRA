@@ -4,6 +4,7 @@ import { SignatureCanvasModal } from "../../components/common/SignatureCanvasMod
 import { OfficialPermissionSheet } from "../../components/common/OfficialPermissionSheet";
 import { HistoriqueGlobalDemandesModal } from "../../components/common/HistoriqueGlobalDemandesModal";
 import { EchoTalkSignModal } from "../../components/accessibility/EchoTalkSignModal";
+import { UserProfileBanner } from "../../components/common/UserProfileBanner";
 
 interface SignatureDoc {
   id: string;
@@ -12,6 +13,7 @@ interface SignatureDoc {
   email: string;
   statut: "EN_ATTENTE_SIGNATURE" | "SIGNE" | "ENVOYE" | "ARCHIVE";
   tsaTimestamp?: string;
+  signatureDataUrl?: string;
   selectedBatch?: boolean;
 }
 
@@ -49,7 +51,6 @@ export function AgentSignaturePage() {
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isEchoTalkSignOpen, setIsEchoTalkSignOpen] = useState(false);
-  const [signatureDataUrl, setSignatureDataUrl] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"EN_COURS" | "TRAITES">("EN_COURS");
 
   useEffect(() => {
@@ -81,12 +82,11 @@ export function AgentSignaturePage() {
   const currentList = activeTab === "EN_COURS" ? docsEnCours : docsTraites;
 
   const handleSaveSignature = (url: string) => {
-    setSignatureDataUrl(url);
     const nowTsa = new Date().toISOString() + " [TSA-GOV-MA-SHA256]";
     setDocs((prev) =>
       prev.map((d) =>
         d.id === selectedId
-          ? { ...d, statut: "SIGNE", tsaTimestamp: nowTsa }
+          ? { ...d, statut: "SIGNE", tsaTimestamp: nowTsa, signatureDataUrl: url }
           : d
       )
     );
@@ -99,6 +99,12 @@ export function AgentSignaturePage() {
 
   const handleSendToCitizen = () => {
     if (!selectedDoc) return;
+    if (!selectedDoc.signatureDataUrl) {
+      showInlineFeedback("send", "⚠️ Le document doit être signé par l'agent avant son envoi au citoyen.");
+      return;
+    }
+    const finalSignatureUrl = selectedDoc.signatureDataUrl;
+
     const signedContent = [
       "Royaume du Maroc. Ministère de la Transition Numérique et de la Réforme de l'Administration.",
       `Décision Administrative d'Autorisation N° ${selectedDoc.id}.`,
@@ -114,6 +120,7 @@ export function AgentSignaturePage() {
       citoyenNom: selectedDoc.citoyen,
       citoyenEmail: selectedDoc.email,
       content: signedContent,
+      signatureDataUrl: finalSignatureUrl,
       sentAt: new Date().toISOString(),
     };
 
@@ -181,6 +188,7 @@ export function AgentSignaturePage() {
 
   return (
     <div className="p-8 max-w-7xl mx-auto space-y-8 font-sans">
+      <UserProfileBanner />
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white/80 backdrop-blur-md p-6 rounded-3xl border border-slate-200 shadow-sm">
         <div className="flex items-center gap-3">
           <span className="p-3 bg-blue-500/10 text-blue-600 rounded-2xl text-2xl font-black">
@@ -301,7 +309,13 @@ export function AgentSignaturePage() {
                   </p>
                 </div>
                 <button
-                  onClick={() => setIsSheetOpen(true)}
+                  onClick={() => {
+                    if (selectedDoc.statut === "EN_ATTENTE_SIGNATURE" || !selectedDoc.signatureDataUrl) {
+                      showInlineFeedback("sheet", "⚠️ La feuille d'autorisation sera disponible après la signature de l'agent.");
+                      return;
+                    }
+                    setIsSheetOpen(true);
+                  }}
                   className="px-3.5 py-2 bg-[#f5efe6] hover:bg-[#e8decb] text-slate-900 font-extrabold text-xs rounded-xl border border-[#d8c8b0] shadow-sm transition flex items-center gap-1.5 cursor-pointer shrink-0"
                 >
                   <span>📜</span> Aperçu Feuille d'Autorisation
@@ -339,7 +353,8 @@ export function AgentSignaturePage() {
                 <div className="space-y-2">
                   <button
                     onClick={handleSendToCitizen}
-                    className="w-full p-4 bg-slate-900 hover:bg-slate-800 text-white font-black text-xs rounded-2xl transition shadow cursor-pointer flex flex-col items-center justify-center gap-2"
+                    disabled={!selectedDoc.signatureDataUrl}
+                    className="w-full p-4 bg-slate-900 hover:bg-slate-800 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-black text-xs rounded-2xl transition shadow cursor-pointer flex flex-col items-center justify-center gap-2"
                   >
                     <span className="text-2xl">📧</span>
                     <span>2. Envoyer le Document au Citoyen</span>
@@ -404,7 +419,7 @@ export function AgentSignaturePage() {
           citoyenNom={selectedDoc.citoyen}
           titre={selectedDoc.titre}
           tsaTimestamp={selectedDoc.tsaTimestamp}
-          signatureDataUrl={signatureDataUrl}
+          signatureDataUrl={selectedDoc.signatureDataUrl}
           onClose={() => setIsSheetOpen(false)}
         />
       )}

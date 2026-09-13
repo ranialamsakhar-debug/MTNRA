@@ -11,7 +11,7 @@ export function PublicLayout() {
 
   return (
     <div
-      className="min-h-screen flex flex-col relative bg-cover bg-center bg-no-repeat bg-fixed"
+      className="min-h-screen flex flex-col relative bg-cover bg-center bg-no-repeat bg-fixed bg-slate-950 text-slate-100"
       style={{ backgroundImage: isLoginPage ? "url('/Rania.png')" : "url('/rania.ma.png')" }}
     >
       {/* Superposition légère pour lisibilité des cartes et formulaires */}

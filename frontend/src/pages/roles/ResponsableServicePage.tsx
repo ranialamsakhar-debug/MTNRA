@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useSearchParams } from "react-router-dom";
+import { UserProfileBanner } from "../../components/common/UserProfileBanner";
 
 interface AgentPerformance {
   id: string;
@@ -72,6 +73,7 @@ export function ResponsableServicePage() {
 
   return (
     <div className="p-6 md:p-8 space-y-8 max-w-7xl mx-auto font-sans">
+      <UserProfileBanner />
       {/* En-tête du Responsable Service */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white p-6 md:p-8 rounded-3xl shadow-xl border border-indigo-800/30">
         <div>

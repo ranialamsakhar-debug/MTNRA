@@ -1,10 +1,12 @@
 import { useState, useRef, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { StripeCheckoutModal } from "../../components/payment/StripeCheckoutModal";
 import { SignLanguageModal } from "../../components/accessibility/SignLanguageModal";
 import { useDossierStore, DocumentItem, DossierItem, DEFAULT_AGENT_RECLAMATION } from "../../store/dossierStore";
 import { useAuthStore } from "../../store/authStore";
 import { compressImageIfNeeded } from "../../utils/imageCompressor";
+import { UserProfileBanner } from "../../components/common/UserProfileBanner";
 
 interface DemandeTypeOption {
   code: string;
@@ -88,6 +90,7 @@ const DEMANDE_TYPES: DemandeTypeOption[] = [
 ];
 
 export function NouvelleReclamationPage() {
+  const [searchParams] = useSearchParams();
   const { addDossier } = useDossierStore();
   const { user } = useAuthStore();
 
@@ -106,6 +109,18 @@ export function NouvelleReclamationPage() {
   const [description, setDescription] = useState("");
   const [cin, setCin] = useState<string>(getInitialCin());
   const [citoyenNom, setCitoyenNom] = useState<string>(getInitialNom());
+
+  useEffect(() => {
+    const requestedType = searchParams.get("type");
+    const type = DEMANDE_TYPES.find((option) => option.code === requestedType);
+    if (type) {
+      setSelectedType(type);
+      const dossier = searchParams.get("dossier");
+      if (dossier) {
+        setTitre(`Saisine du médiateur concernant le dossier ${dossier}`);
+      }
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     if (user) {
@@ -130,10 +145,71 @@ export function NouvelleReclamationPage() {
   const [inputMethod, setInputMethod] = useState<"TEXT" | "AUDIO" | "SIGNES">("TEXT");
   const [isRecording, setIsRecording] = useState(false);
   const [isLSMModalOpen, setIsLSMModalOpen] = useState(false);
+
+  // IA Text Optimizer State
+  const [isOptimizingText, setIsOptimizingText] = useState(false);
+  const [optimizedData, setOptimizedData] = useState<{
+    originalText: string;
+    optimizedText: string;
+    summaryPoints: string[];
+    objetPropose: string;
+  } | null>(null);
+  const [isOptimizeModalOpen, setIsOptimizeModalOpen] = useState(false);
+  const [previousDescription, setPreviousDescription] = useState<string | null>(null);
+
   const videoRef = useRef<HTMLVideoElement>(null);
   const [mediaStream, setMediaStream] = useState<MediaStream | null>(null);
   const recognitionRef = useRef<any>(null);
   const timeoutRef = useRef<any>(null);
+  const isRecordingRef = useRef<boolean>(false);
+
+  // Sync isRecordingRef with isRecording state for use inside closures
+  useEffect(() => {
+    isRecordingRef.current = isRecording;
+  }, [isRecording]);
+
+  const handleOptimizeText = async () => {
+    if (!description || description.trim().length < 5) {
+      alert("Veuillez d'abord saisir au moins quelques mots dans votre description avant d'utiliser l'optimiseur de texte IA.");
+      return;
+    }
+
+    setIsOptimizingText(true);
+    try {
+      const res = await fetch("http://localhost:8000/api/chatbot/optimize-text", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: description })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setOptimizedData({
+          originalText: description,
+          optimizedText: data.optimizedText,
+          summaryPoints: data.summaryPoints || [],
+          objetPropose: data.objetPropose || "Demande administrative"
+        });
+        setIsOptimizeModalOpen(true);
+      } else {
+        throw new Error("Erreur de réponse de l'IA d'optimisation");
+      }
+    } catch (err) {
+      console.warn("Optimiseur IA distant non disponible, exécution du mode secours client :", err);
+      const sentences = description.split(/[\n.]+/).map(s => s.trim()).filter(s => s.length > 3);
+      const points = sentences.slice(0, 4).map((s, i) => `Point ${i + 1} : ${s}`);
+      const synthesis = `📋 SYNTHÈSE ET OPTIMISATION IA DE LA DEMANDE :\n\n• Objet : Demande administrative synthétisée\n• Résumé : ${sentences.join(". ")}\n\n• Points clés identifiés :\n` + points.map(p => `  - ${p}`).join("\n");
+      
+      setOptimizedData({
+        originalText: description,
+        optimizedText: synthesis,
+        summaryPoints: points,
+        objetPropose: "Demande administrative synthétisée"
+      });
+      setIsOptimizeModalOpen(true);
+    } finally {
+      setIsOptimizingText(false);
+    }
+  };
 
   useEffect(() => {
     if (videoRef.current && mediaStream) {
@@ -143,12 +219,15 @@ export function NouvelleReclamationPage() {
 
   const stopRecording = () => {
     setIsRecording(false);
+    isRecordingRef.current = false;
     if (mediaStream) {
       mediaStream.getTracks().forEach(track => track.stop());
       setMediaStream(null);
     }
     if (recognitionRef.current) {
-      recognitionRef.current.stop();
+      const rec = recognitionRef.current;
+      recognitionRef.current = null; // Effacer avant stop pour bloquer l'auto-redémarrage dans onend
+      try { rec.stop(); } catch { /* déjà arrêté */ }
     }
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
@@ -169,56 +248,93 @@ export function NouvelleReclamationPage() {
         }, 5000);
       } catch (err) {
         console.error("Erreur accès caméra", err);
-        alert("Impossible d'accéder à la caméra. Vérifiez vos permissions.");
+        alert("Impossible d'accéder à la caméra. Vérifiez vos permissions dans les paramètres du navigateur.");
         setIsRecording(false);
       }
+
     } else if (method === "AUDIO") {
-      try {
-        const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-        if (SpeechRecognition) {
-          const recognition = new SpeechRecognition();
-          recognition.lang = 'fr-FR';
-          recognition.interimResults = true;
-          recognition.continuous = true;
+      // ── Vérification support microphone ──────────────────────────────
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        alert("Votre navigateur ne supporte pas l'accès au microphone. Utilisez Chrome, Edge ou Safari.");
+        setIsRecording(false);
+        return;
+      }
 
-          recognition.onresult = (event: any) => {
-            let finalTranscript = '';
-            for (let i = event.resultIndex; i < event.results.length; ++i) {
-              if (event.results[i].isFinal) {
-                finalTranscript += event.results[i][0].transcript;
-              }
-            }
-            if (finalTranscript) {
-              setDescription(prev => prev + (prev ? " " : "") + finalTranscript);
-            }
-          };
+      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
-          recognition.onerror = (event: any) => {
-            console.error("Erreur STT", event);
-          };
-
-          recognition.onend = () => {
-            setIsRecording(false);
-          };
-
-          recognitionRef.current = recognition;
-          recognition.start();
-
-          timeoutRef.current = setTimeout(() => {
-            setDescription(prev => {
-              if (prev.length === 0) {
-                return "[Transcription Audio] : J'aimerais déposer une demande concernant mon dossier administratif car je n'arrive pas à télécharger les pièces.";
-              }
-              return prev;
-            });
-          }, 6000);
-
-        } else {
-          alert("Votre navigateur ne supporte pas la reconnaissance vocale native.");
+      if (!SpeechRecognition) {
+        // ── Fallback : MediaRecorder → affichage message d'attente ─────
+        try {
+          await navigator.mediaDevices.getUserMedia({ audio: true });
+          setDescription(prev =>
+            prev + (prev ? " " : "") +
+            "[Enregistrement vocal actif — navigateur sans reconnaissance vocale native. Utilisez Chrome ou Edge pour la transcription automatique.]"
+          );
+          timeoutRef.current = setTimeout(() => setIsRecording(false), 8000);
+        } catch {
+          alert("Impossible d'accéder au microphone. Vérifiez que vous avez autorisé l'accès au microphone dans votre navigateur.");
           setIsRecording(false);
         }
+        return;
+      }
+
+      // ── Reconnaissance vocale native (Chrome / Edge / Safari) ────────
+      try {
+        // Demander la permission micro explicitement avant de démarrer
+        await navigator.mediaDevices.getUserMedia({ audio: true });
+      } catch {
+        alert("Accès au microphone refusé. Cliquez sur l'icône 🔒 dans la barre d'adresse et autorisez le microphone.");
+        setIsRecording(false);
+        return;
+      }
+
+      try {
+        const recognition = new SpeechRecognition();
+        recognition.lang = 'fr-FR';
+        recognition.interimResults = true;
+        recognition.continuous = true;
+        recognition.maxAlternatives = 1;
+
+        recognition.onresult = (event: any) => {
+          let finalTranscript = '';
+          for (let i = event.resultIndex; i < event.results.length; ++i) {
+            if (event.results[i].isFinal) {
+              finalTranscript += event.results[i][0].transcript;
+            }
+          }
+          if (finalTranscript.trim()) {
+            setDescription(prev => prev + (prev ? " " : "") + finalTranscript.trim());
+          }
+        };
+
+        recognition.onerror = (event: any) => {
+          console.warn("Erreur reconnaissance vocale :", event.error);
+          if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+            alert("Microphone bloqué par le navigateur. Autorisez l'accès dans les paramètres.");
+            setIsRecording(false);
+          } else if (event.error === 'no-speech') {
+            // Pas de parole détectée — on continue silencieusement
+          } else if (event.error === 'network') {
+            alert("Erreur réseau pendant la reconnaissance vocale. Vérifiez votre connexion internet.");
+            setIsRecording(false);
+          }
+        };
+
+        // Auto-redémarrage si la reconnaissance s'arrête seule (comportement Chrome)
+        recognition.onend = () => {
+          if (recognitionRef.current === recognition && isRecordingRef.current) {
+            try { recognition.start(); } catch { /* déjà arrêté */ }
+          } else {
+            setIsRecording(false);
+          }
+        };
+
+        recognitionRef.current = recognition;
+        recognition.start();
+
       } catch (err) {
-        console.error("Erreur STT", err);
+        console.error("Erreur démarrage STT", err);
+        alert("Impossible de démarrer la reconnaissance vocale. Réessayez ou utilisez la saisie texte.");
         setIsRecording(false);
       }
     }
@@ -338,7 +454,8 @@ export function NouvelleReclamationPage() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8 pb-12">
+    <div className="max-w-6xl mx-auto space-y-10 py-6 px-4 sm:px-6 lg:px-8 pb-16">
+      <UserProfileBanner />
       {/* En-tête de la démarche */}
       <motion.div
         initial={{ opacity: 0, y: -10 }}
@@ -525,6 +642,37 @@ export function NouvelleReclamationPage() {
             placeholder="Expliquez en détail votre situation..."
             className="w-full p-3 rounded-xl border border-slate-300 bg-white text-xs focus:ring-2 focus:ring-primary outline-none"
           />
+
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 pt-1">
+            <button
+              type="button"
+              onClick={handleOptimizeText}
+              disabled={isOptimizingText || !description.trim()}
+              className={`px-4 py-2 rounded-xl text-xs font-black flex items-center gap-2 shadow-sm transition cursor-pointer ${
+                isOptimizingText
+                  ? "bg-indigo-100 text-indigo-700 animate-pulse border border-indigo-200"
+                  : description.trim()
+                  ? "bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white hover:shadow-md"
+                  : "bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200"
+              }`}
+            >
+              <span>✨</span>
+              <span>{isOptimizingText ? "Optimisation IA en cours..." : "Optimiser & Synthétiser le texte avec l'IA"}</span>
+            </button>
+
+            {previousDescription && (
+              <button
+                type="button"
+                onClick={() => {
+                  setDescription(previousDescription);
+                  setPreviousDescription(null);
+                }}
+                className="text-[11px] text-amber-700 hover:underline font-bold flex items-center gap-1 cursor-pointer"
+              >
+                <span>↩️</span> <span>Rétablir le texte initial non optimisé</span>
+              </button>
+            )}
+          </div>
         </div>
 
         {/* 3. Pièces Jointes & Documents Requis avec affichage transparent */}
@@ -742,6 +890,94 @@ export function NouvelleReclamationPage() {
             <div className="flex justify-end pt-2">
               <button onClick={() => setSelectedDocPreview(null)} className="px-6 py-2.5 bg-slate-900 text-white text-xs font-bold rounded-xl hover:bg-slate-800 transition">
                 Fermer l'aperçu
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Optimiseur de Texte IA */}
+      {isOptimizeModalOpen && optimizedData && (
+        <div className="fixed inset-0 z-[90] bg-black/70 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-6 max-w-2xl w-full space-y-5 shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b pb-3">
+              <div className="flex items-center gap-2">
+                <span className="w-8 h-8 rounded-xl bg-indigo-100 text-indigo-700 font-extrabold flex items-center justify-center text-base">✨</span>
+                <div>
+                  <span className="text-[10px] font-extrabold uppercase text-indigo-600 tracking-wider">Module d'Intelligence Artificielle</span>
+                  <h3 className="font-black text-slate-900 text-base">Synthèse & Optimisation de la Demande</h3>
+                </div>
+              </div>
+              <button onClick={() => setIsOptimizeModalOpen(false)} className="text-slate-400 hover:text-slate-900 font-bold text-base">✕</button>
+            </div>
+
+            <div className="p-3 bg-indigo-50/80 rounded-2xl border border-indigo-100 text-xs text-indigo-950 space-y-1">
+              <p className="font-bold flex items-center gap-1.5">
+                <span>🎯 Objet Identifié :</span>
+                <span className="bg-white px-2.5 py-0.5 rounded-full border border-indigo-200 font-mono text-[11px] font-bold text-indigo-900">{optimizedData.objetPropose}</span>
+              </p>
+              <p className="text-[11px] text-indigo-800 leading-relaxed">
+                L'IA a analysé et réduit le texte rédigé par le citoyen pour extraire tous les points clés et les présenter de manière claire et générale.
+              </p>
+            </div>
+
+            {/* Points clés retenus */}
+            {optimizedData.summaryPoints.length > 0 && (
+              <div className="p-4 bg-slate-900 text-slate-100 rounded-2xl border border-slate-800 space-y-2">
+                <h4 className="text-xs font-black uppercase text-indigo-300 tracking-wider flex items-center gap-2">
+                  <span>📌</span> <span>Points clés extraits et récapitulés de manière générale :</span>
+                </h4>
+                <ul className="space-y-1.5 text-xs text-slate-200">
+                  {optimizedData.summaryPoints.map((pt, i) => (
+                    <li key={i} className="flex items-start gap-2 bg-slate-800/60 p-2.5 rounded-xl border border-slate-700/60">
+                      <span className="text-emerald-400 font-bold">✓</span>
+                      <span>{pt}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* Comparaison Texte Original vs Texte Synthétisé */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+              <div className="space-y-1.5">
+                <label className="font-extrabold text-slate-600 uppercase text-[10px] block">Texte Original du Citoyen :</label>
+                <div className="p-3 bg-slate-100 rounded-xl border border-slate-200 text-slate-700 max-h-48 overflow-y-auto leading-relaxed font-medium">
+                  {optimizedData.originalText}
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <label className="font-extrabold text-indigo-700 uppercase text-[10px] block flex items-center gap-1">
+                  <span>✨</span> <span>Texte Optimisé & Condensé :</span>
+                </label>
+                <textarea
+                  rows={6}
+                  value={optimizedData.optimizedText}
+                  onChange={(e) => setOptimizedData({ ...optimizedData, optimizedText: e.target.value })}
+                  className="w-full p-3 bg-indigo-50/40 rounded-xl border-2 border-indigo-200 text-slate-900 font-medium focus:ring-2 focus:ring-indigo-500 outline-none max-h-48 leading-relaxed"
+                />
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-3 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setIsOptimizeModalOpen(false)}
+                className="w-full sm:w-auto px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition"
+              >
+                Annuler
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setPreviousDescription(description);
+                  setDescription(optimizedData.optimizedText);
+                  setIsOptimizeModalOpen(false);
+                }}
+                className="w-full sm:w-auto px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black rounded-xl shadow-lg transition flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <span>✅</span> <span>Appliquer cette synthèse à ma demande</span>
               </button>
             </div>
           </div>

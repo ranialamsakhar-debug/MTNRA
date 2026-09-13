@@ -1,11 +1,13 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
+import { UserProfileBanner } from "../../components/common/UserProfileBanner";
 
 export function RendezVousPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   return (
-    <div className="space-y-6 p-4">
+    <div className="max-w-7xl mx-auto space-y-8 py-6 px-4 sm:px-6 lg:px-8">
+      <UserProfileBanner />
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}

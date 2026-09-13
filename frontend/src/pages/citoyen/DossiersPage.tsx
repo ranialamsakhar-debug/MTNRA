@@ -7,6 +7,7 @@ import { useAuthStore } from "../../store/authStore";
 import { OfficialPermissionSheet } from "../../components/common/OfficialPermissionSheet";
 import { compressImageIfNeeded } from "../../utils/imageCompressor";
 import { EchoTalkSignModal } from "../../components/accessibility/EchoTalkSignModal";
+import { UserProfileBanner } from "../../components/common/UserProfileBanner";
 
 interface SignedDocument {
   id: string;
@@ -14,6 +15,7 @@ interface SignedDocument {
   citoyenNom: string;
   citoyenEmail: string;
   content: string;
+  signatureDataUrl?: string | null;
   sentAt: string;
 }
 
@@ -37,6 +39,7 @@ export function DossiersPage() {
   const [selectedSheetDossier, setSelectedSheetDossier] = useState<DossierItem | null>(null);
   const [signedDocuments, setSignedDocuments] = useState<SignedDocument[]>([]);
   const [selectedSignedDocument, setSelectedSignedDocument] = useState<SignedDocument | null>(null);
+  const [selectedSignedSheetDocument, setSelectedSignedSheetDocument] = useState<SignedDocument | null>(null);
 
   const loadSignedDocuments = () => {
     try {
@@ -125,7 +128,8 @@ export function DossiersPage() {
   };
 
   return (
-    <div className="space-y-6" dir={lang === "AR" ? "rtl" : "ltr"}>
+    <div className="max-w-7xl mx-auto space-y-10 py-6 px-4 sm:px-6 lg:px-8" dir={lang === "AR" ? "rtl" : "ltr"}>
+      <UserProfileBanner />
       {receivedSignedDocuments.length > 0 && (
         <motion.section
           initial={{ opacity: 0, y: -10 }}
@@ -143,15 +147,30 @@ export function DossiersPage() {
             {receivedSignedDocuments.map((document) => (
               <div key={document.id} className="bg-white/10 border border-white/10 rounded-2xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
                 <div>
-                  <p className="text-xs font-black text-white">{document.id} — {document.title}</p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-xs font-black text-white">{document.id} — {document.title}</p>
+                    {document.signatureDataUrl && (
+                      <span className="text-[10px] bg-emerald-500/20 text-emerald-300 font-extrabold px-2 py-0.5 rounded-full border border-emerald-500/30">
+                        ✍️ Signature Manuscrite Inclus
+                      </span>
+                    )}
+                  </div>
                   <p className="text-[11px] text-slate-300 mt-1">Envoyé le {new Date(document.sentAt).toLocaleString("fr-FR")}</p>
                 </div>
-                <button
-                  onClick={() => setSelectedSignedDocument(document)}
-                  className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs rounded-xl transition cursor-pointer"
-                >
-                  🤟 Traduire en signes
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setSelectedSignedSheetDocument(document)}
+                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-black text-xs rounded-xl transition cursor-pointer flex items-center gap-1.5 shadow-sm"
+                  >
+                    <span>📜</span> Consulter l'Acte & Signature
+                  </button>
+                  <button
+                    onClick={() => setSelectedSignedDocument(document)}
+                    className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs rounded-xl transition cursor-pointer flex items-center gap-1.5"
+                  >
+                    <span>🤟</span> Traduire en signes
+                  </button>
+                </div>
               </div>
             ))}
           </div>
@@ -163,19 +182,19 @@ export function DossiersPage() {
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="p-6 bg-[#fdfbf7] border-2 border-stone-300 text-slate-900 rounded-3xl shadow-sm space-y-3 relative overflow-hidden"
+          className="p-6 bg-amber-500/10 border border-amber-500/30 backdrop-blur-md text-slate-900 rounded-3xl shadow-sm space-y-3 relative overflow-hidden"
         >
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-center gap-3">
-              <span className="w-10 h-10 rounded-2xl bg-stone-200 text-2xl flex items-center justify-center shadow-inner shrink-0">
+              <span className="w-10 h-10 rounded-2xl bg-amber-500/20 text-2xl flex items-center justify-center shrink-0">
                 🔔
               </span>
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="px-3 py-0.5 rounded-full bg-slate-900 text-white font-extrabold text-[10px] uppercase tracking-wider">
+                  <span className="px-3 py-0.5 rounded-full bg-amber-600 text-white font-extrabold text-[10px] uppercase tracking-wider">
                     Notification Officielle d'Instruction
                   </span>
-                  <span className="text-xs font-mono font-bold text-slate-700">
+                  <span className="text-xs font-mono font-bold text-amber-900">
                     {pendingNotificationDossier.numeroDossier}
                   </span>
                 </div>
@@ -190,13 +209,13 @@ export function DossiersPage() {
                 setSelectedDossier(pendingNotificationDossier);
                 setUrgentTargetDossier(pendingNotificationDossier);
               }}
-              className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow transition cursor-pointer flex items-center gap-1.5 shrink-0"
+              className="px-4 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-xl shadow transition cursor-pointer flex items-center gap-1.5 shrink-0"
             >
               <span>⚡</span> <span>Ajouter le Document Urgent Maintenant</span>
             </button>
           </div>
 
-          <div className="p-4 bg-[#f5f0eb] rounded-2xl border border-stone-300 text-xs font-semibold leading-relaxed text-slate-800">
+          <div className="p-4 bg-white/80 rounded-2xl border border-amber-200/80 text-xs font-semibold leading-relaxed text-slate-800">
             💬 <strong>Motif / Exigence de l'Agent Instructeur :</strong> « {pendingNotificationDossier.motifDemandePiece || pendingNotificationDossier.remarqueAgent} »
           </div>
         </motion.div>
@@ -205,11 +224,11 @@ export function DossiersPage() {
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="bg-white/90 backdrop-blur-md rounded-3xl p-6 md:p-8 shadow-xl border border-white/40 space-y-6"
+        className="bg-white/90 backdrop-blur-md rounded-3xl p-6 md:p-8 shadow-xl border border-slate-200/80 space-y-6"
       >
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-black text-slate-800 flex items-center gap-3">
+            <h1 className="text-2xl font-black text-slate-900 flex items-center gap-3">
               <span>📁</span>
               <span>{t.title}</span>
             </h1>
@@ -217,7 +236,7 @@ export function DossiersPage() {
               Consultez l'historique de vos réclamations et ajoutez des pièces complémentaires lorsqu'elles sont réclamées par l'agent instructeur.
             </p>
           </div>
-          <span className="px-3.5 py-1.5 bg-slate-900/10 text-slate-900 rounded-full text-xs font-extrabold w-fit">
+          <span className="px-4 py-2 bg-indigo-50 text-indigo-700 border border-indigo-100 rounded-full text-xs font-extrabold w-fit shadow-xs">
             {dossiers.length} dossier(s) enregistré(s)
           </span>
         </div>
@@ -229,56 +248,56 @@ export function DossiersPage() {
           </div>
         )}
         
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto rounded-2xl border border-slate-200/80">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-slate-50 text-slate-600 text-xs uppercase tracking-wider">
-                <th className="p-4 border-b">N° Réclamation</th>
-                <th className="p-4 border-b">Type de Démarche</th>
-                <th className="p-4 border-b">Agent Référent</th>
-                <th className="p-4 border-b">Date</th>
-                <th className="p-4 border-b">Documents Jointe</th>
-                <th className="p-4 border-b">Statut</th>
-                <th className="p-4 border-b text-right">Actions Rapides</th>
+              <tr className="bg-slate-50/80 text-slate-600 text-xs uppercase tracking-wider font-extrabold">
+                <th className="py-4 px-6 border-b border-slate-200/80">N° Réclamation</th>
+                <th className="py-4 px-6 border-b border-slate-200/80">Type de Démarche</th>
+                <th className="py-4 px-6 border-b border-slate-200/80">Agent Référent</th>
+                <th className="py-4 px-6 border-b border-slate-200/80">Date</th>
+                <th className="py-4 px-6 border-b border-slate-200/80">Documents Jointes</th>
+                <th className="py-4 px-6 border-b border-slate-200/80">Statut</th>
+                <th className="py-4 px-6 border-b border-slate-200/80 text-right">Actions Rapides</th>
               </tr>
             </thead>
-            <tbody className="text-sm">
+            <tbody className="text-sm divide-y divide-slate-100">
               {dossiers.map((dossier) => {
                 const isUrgentAllowed = Boolean(dossier.demandeDocumentsSupplementaires || dossier.statut === "EN_ATTENTE_PIECE");
                 return (
-                  <tr key={dossier.id} className="hover:bg-slate-50 transition border-b">
-                    <td className="p-4 font-mono font-bold text-slate-900">{dossier.numeroDossier}</td>
-                    <td className="p-4 font-semibold text-slate-800">{dossier.typeDemande}</td>
-                    <td className="p-4">
-                      <span className="px-2.5 py-1 bg-slate-100 text-slate-900 border border-slate-300 rounded-full text-xs font-extrabold flex items-center gap-1.5 w-fit">
+                  <tr key={dossier.id} className="hover:bg-indigo-50/30 transition-colors">
+                    <td className="py-4 px-6 font-mono font-bold text-slate-900">{dossier.numeroDossier}</td>
+                    <td className="py-4 px-6 font-semibold text-slate-800">{dossier.typeDemande}</td>
+                    <td className="py-4 px-6">
+                      <span className="px-3 py-1 bg-slate-100 text-slate-800 border border-slate-200 rounded-full text-xs font-bold flex items-center gap-1.5 w-fit">
                         👤 M. {dossier.agentAffecte?.prenom || "Ahmed"} {dossier.agentAffecte?.nom || "Benali"}
                       </span>
                     </td>
-                    <td className="p-4 text-xs text-slate-500">{dossier.dateCreation}</td>
-                    <td className="p-4">
-                      <span className="px-2.5 py-1 bg-slate-100 text-slate-800 border border-slate-200 rounded-full text-xs font-extrabold flex items-center gap-1.5 w-fit">
+                    <td className="py-4 px-6 text-xs text-slate-500 font-medium">{dossier.dateCreation}</td>
+                    <td className="py-4 px-6">
+                      <span className="px-3 py-1 bg-indigo-50 text-indigo-700 border border-indigo-100 rounded-full text-xs font-bold flex items-center gap-1.5 w-fit">
                         <span>📎</span> {dossier.documents.length} pièce(s)
                       </span>
                     </td>
-                    <td className="p-4">
-                      <span className={`px-2.5 py-1 rounded-md text-[10px] font-bold ${
+                    <td className="py-4 px-6">
+                      <span className={`px-3 py-1 rounded-full text-[11px] font-extrabold ${
                         dossier.statut === "VALIDE" || dossier.statut === "CERTIFIE" || dossier.statut === "SIGNE"
-                          ? "bg-slate-100 text-slate-900 border border-slate-300"
+                          ? "bg-emerald-100 text-emerald-800 border border-emerald-200"
                           : dossier.statut === "REJETE"
-                          ? "bg-slate-900 text-white"
+                          ? "bg-rose-100 text-rose-800 border border-rose-200"
                           : dossier.statut === "EN_ATTENTE_PIECE"
-                          ? "bg-slate-900 text-white"
-                          : "bg-slate-100 text-slate-700 border border-slate-200"
+                          ? "bg-amber-100 text-amber-900 border border-amber-200"
+                          : "bg-indigo-100 text-indigo-800 border border-indigo-200"
                       }`}>
                         {dossier.statut === "EN_ATTENTE_PIECE" ? "⚠️ Document Requis" : dossier.statut.replace("_", " ")}
                       </span>
                     </td>
-                    <td className="p-4 text-right">
-                      <div className="flex items-center justify-end gap-2">
+                    <td className="py-4 px-6 text-right">
+                      <div className="flex items-center justify-end gap-2.5">
                         {isUrgentAllowed ? (
                           <button
                             onClick={() => setUrgentTargetDossier(dossier)}
-                            className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-xs shadow transition cursor-pointer flex items-center gap-1 border border-slate-700"
+                            className="px-3.5 py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold rounded-xl text-xs shadow-xs transition cursor-pointer flex items-center gap-1"
                             title="Ajouter les pièces complémentaires urgentes réclamées par l'agent"
                           >
                             <span>⚡</span> <span>Ajout Document Urgent</span>
@@ -286,22 +305,32 @@ export function DossiersPage() {
                         ) : (
                           <button
                             disabled
-                            className="px-3 py-1.5 bg-slate-100 text-slate-400 border border-slate-200 font-bold rounded-xl text-xs cursor-not-allowed flex items-center gap-1 opacity-60"
+                            className="px-3.5 py-2 bg-slate-100 text-slate-400 border border-slate-200 font-bold rounded-xl text-xs cursor-not-allowed flex items-center gap-1 opacity-60"
                             title="🔒 Option désactivée : Aucun document complémentaire n'a été réclamé par l'agent pour ce dossier."
                           >
                             <span>🔒</span> <span>Ajout Non Requis</span>
                           </button>
                         )}
-                        <button
-                          onClick={() => setSelectedSheetDossier(dossier)}
-                          className="px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-xs transition cursor-pointer flex items-center gap-1 shadow-sm"
-                          title="Consulter la Décision Officielle & la Feuille d'Autorisation signée"
-                        >
-                          <span>📜</span> <span>Feuille d'Autorisation</span>
-                        </button>
+                        {receivedSignedDocuments.some((document) => document.id === dossier.numeroDossier || document.id === dossier.id) && (
+                          <button
+                            onClick={() => setSelectedSheetDossier(dossier)}
+                            className="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-xs transition cursor-pointer flex items-center gap-1 shadow-xs"
+                            title="Consulter la Décision Officielle & la Feuille d'Autorisation signée"
+                          >
+                            <span>📜</span> <span>Feuille d'Autorisation</span>
+                          </button>
+                        )}
+                        {dossier.statut === "REJETE" && (
+                          <Link
+                            to={`/citoyen/nouvelle-demande?type=SAISINE_MEDIATEUR&dossier=${encodeURIComponent(dossier.numeroDossier)}`}
+                            className="px-3.5 py-2 bg-teal-600 hover:bg-teal-700 text-white font-extrabold rounded-xl text-xs transition cursor-pointer flex items-center gap-1 shadow-xs"
+                          >
+                            <span>⚖️</span> <span>Saisir le Médiateur</span>
+                          </Link>
+                        )}
                         <button
                           onClick={() => setSelectedDossier(dossier)}
-                          className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white font-extrabold rounded-xl text-xs transition cursor-pointer flex items-center gap-1"
+                          className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold rounded-xl text-xs transition cursor-pointer flex items-center gap-1 shadow-xs"
                         >
                           <span>👁️</span> <span>Détails</span>
                         </button>
@@ -321,7 +350,7 @@ export function DossiersPage() {
           <div className="bg-white rounded-3xl p-6 md:p-8 max-w-2xl w-full space-y-6 shadow-2xl border max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b pb-4">
               <div>
-                <span className="text-xs font-mono font-bold text-primary uppercase">Réclamation n°</span>
+                <span className="text-xs font-mono font-bold text-indigo-600 uppercase">Réclamation n°</span>
                 <h3 className="text-xl font-black text-slate-900">{selectedDossier.numeroDossier}</h3>
               </div>
               <button onClick={() => setSelectedDossier(null)} className="text-slate-400 hover:text-slate-900 font-bold text-lg">✕</button>
@@ -383,36 +412,36 @@ export function DossiersPage() {
             </div>
 
             {/* SECTION CONCRÈTE ET TRANSPARENTE DES COMMENTAIRES ET MOTIFS D'AGENT */}
-            <div className="p-4 bg-[#3d2b1f] text-[#f7f4ed] rounded-2xl space-y-3 border border-[#523d2e] shadow-md">
+            <div className="p-5 bg-slate-900 text-slate-100 rounded-2xl space-y-3 border border-slate-800 shadow-md">
               <div className="flex items-center justify-between">
-                <h4 className="text-xs font-black uppercase text-amber-200 flex items-center gap-1.5">
+                <h4 className="text-xs font-black uppercase text-indigo-300 tracking-wider flex items-center gap-1.5">
                   <span>💬</span> <span>Commentaires, Motifs & Décision d'Agent Instructeur</span>
                 </h4>
-                <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black ${
+                <span className={`px-3 py-0.5 rounded-full text-[10px] font-black ${
                   selectedDossier.statut === "VALIDE" || selectedDossier.statut === "CERTIFIE" || selectedDossier.statut === "SIGNE"
-                    ? "bg-[#281c14] text-[#f7f4ed] border border-[#523d2e]"
+                    ? "bg-emerald-950 text-emerald-300 border border-emerald-800/60"
                     : selectedDossier.statut === "REJETE"
-                    ? "bg-[#281c14] text-[#f7f4ed] border border-[#523d2e]"
-                    : "bg-[#281c14] text-[#f7f4ed] border border-[#523d2e]"
+                    ? "bg-rose-950 text-rose-300 border border-rose-800/60"
+                    : "bg-amber-950 text-amber-300 border border-amber-800/60"
                 }`}>
                   {selectedDossier.statut.replace('_', ' ')}
                 </span>
               </div>
               
-              <div className="p-3.5 bg-white/10 rounded-xl border border-white/10 text-xs font-medium leading-relaxed">
+              <div className="p-4 bg-slate-800/80 rounded-xl border border-slate-700 text-xs font-medium leading-relaxed text-slate-200">
                 « {selectedDossier.remarqueAgent || selectedDossier.motifDemandePiece || "Bonjour. Votre dossier est actuellement en cours d'instruction administrative par l'agent référent."} »
               </div>
 
               {selectedDossier.historiqueActions && selectedDossier.historiqueActions.length > 0 && (
-                <div className="pt-2 space-y-1.5 border-t border-white/10">
-                  <span className="text-[10px] font-bold uppercase text-amber-200/70">Historique complet des interventions :</span>
+                <div className="pt-3 space-y-2 border-t border-slate-800">
+                  <span className="text-[10px] font-bold uppercase text-indigo-300/80 tracking-wider">Historique complet des interventions :</span>
                   {selectedDossier.historiqueActions.map(act => (
-                    <div key={act.id} className="text-[11px] text-[#f7f4ed] bg-white/5 p-2 rounded-lg border border-white/5 flex flex-col gap-0.5">
+                    <div key={act.id} className="text-[11px] text-slate-200 bg-slate-800/50 p-2.5 rounded-xl border border-slate-700/50 flex flex-col gap-1">
                       <div className="flex items-center justify-between">
-                        <span className="font-bold text-amber-200">{act.auteur} ({act.auteurRole})</span>
-                        <span className="text-[9px] text-stone-300 font-mono">{act.date}</span>
+                        <span className="font-bold text-indigo-300">{act.auteur} ({act.auteurRole})</span>
+                        <span className="text-[9px] text-slate-400 font-mono">{act.date}</span>
                       </div>
-                      <p className="text-stone-200">{act.commentaire}</p>
+                      <p className="text-slate-300">{act.commentaire}</p>
                     </div>
                   ))}
                 </div>
@@ -439,7 +468,7 @@ export function DossiersPage() {
                     setSelectedDossier(null);
                     setUrgentTargetDossier(current);
                   }}
-                  className="px-3 py-1 bg-[#3d2b1f] hover:bg-[#2c1e15] text-[#f7f4ed] text-xs font-black rounded-xl shadow transition flex items-center gap-1 cursor-pointer"
+                  className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black rounded-xl shadow transition flex items-center gap-1 cursor-pointer"
                 >
                   <span>⚡</span> <span>+ Ajouter Pièce Urgente</span>
                 </button>
@@ -447,7 +476,7 @@ export function DossiersPage() {
 
               <div className="grid grid-cols-1 gap-3">
                 {selectedDossier.documents.map((doc) => (
-                  <div key={doc.id} className="p-4 bg-slate-50 rounded-2xl border border-slate-200 flex flex-col md:flex-row items-start md:items-center justify-between gap-3 shadow-sm hover:border-slate-300 transition">
+                  <div key={doc.id} className="p-4 bg-slate-50 rounded-2xl border border-slate-200 flex flex-col md:flex-row items-start md:items-center justify-between gap-3 shadow-xs hover:border-slate-300 transition">
                     <div className="flex items-center gap-3">
                       <span className="text-3xl">📜</span>
                       <div>
@@ -455,14 +484,14 @@ export function DossiersPage() {
                         <div className="flex items-center gap-2 mt-1">
                           <span className="text-[10px] bg-slate-200 text-slate-700 font-bold px-2 py-0.5 rounded-full">{doc.typeDocument}</span>
                           <span className="text-[10px] text-slate-500">{doc.tailleFormatted}</span>
-                          <span className="text-[10px] text-slate-700 font-bold">✓ SHA-256 Conforme</span>
+                          <span className="text-[10px] text-emerald-700 font-bold">✓ SHA-256 Conforme</span>
                         </div>
                       </div>
                     </div>
 
                     <button
                       onClick={() => setSelectedDocPreview(doc)}
-                      className="w-full md:w-auto px-4 py-2 bg-[#f5efe6] hover:bg-[#e8decb] text-slate-900 font-extrabold text-xs rounded-xl border border-[#d8c8b0] shadow-sm transition cursor-pointer flex items-center justify-center gap-1.5"
+                      className="w-full md:w-auto px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-900 font-extrabold text-xs rounded-xl border border-indigo-200 shadow-xs transition cursor-pointer flex items-center justify-center gap-1.5"
                     >
                       <span>👁️</span> <span>Aperçu Photo & SHA-256</span>
                     </button>
@@ -472,7 +501,7 @@ export function DossiersPage() {
             </div>
 
             <div className="flex justify-end pt-4 border-t border-slate-100">
-              <button onClick={() => setSelectedDossier(null)} className="px-6 py-2.5 bg-[#3d2b1f] hover:bg-[#2c1e15] text-[#f7f4ed] text-xs font-bold rounded-xl transition">
+              <button onClick={() => setSelectedDossier(null)} className="px-6 py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition">
                 Fermer
               </button>
             </div>
@@ -522,7 +551,7 @@ export function DossiersPage() {
             <div className="flex justify-end pt-2">
               <button
                 onClick={() => setUrgentTargetDossier(null)}
-                className="px-6 py-2.5 bg-[#3d2b1f] text-[#f7f4ed] text-xs font-bold rounded-xl hover:bg-[#2c1e15] transition"
+                className="px-6 py-2.5 bg-slate-900 text-white text-xs font-bold rounded-xl hover:bg-slate-800 transition"
               >
                 Fermer
               </button>
@@ -545,8 +574,8 @@ export function DossiersPage() {
             
             <div className="space-y-4">
               {/* VRAIE PHOTO / APERÇU DU DOCUMENT */}
-              <div className="p-3 bg-[#3d2b1f] text-[#f7f4ed] rounded-2xl border border-[#523d2e] text-center space-y-2">
-                <span className="text-[10px] font-bold text-amber-200 uppercase tracking-wider block">📷 Aperçu Visuel de la Photo / Pièce Transmise</span>
+              <div className="p-4 bg-slate-900 text-slate-100 rounded-2xl border border-slate-800 text-center space-y-2">
+                <span className="text-[10px] font-bold text-indigo-300 uppercase tracking-wider block">📷 Aperçu Visuel de la Photo / Pièce Transmise</span>
                 {(() => {
                   // Photo scannée sur mesure dans le navigateur (dataUrl d'upload direct ou photo CNIE scannée manuellement)
                   const customScannedPhoto = localStorage.getItem('tawsa_cni_photo_' + (user?.cin || 'AI225')) || localStorage.getItem('tawsa_cni_photo');
@@ -559,13 +588,13 @@ export function DossiersPage() {
                   
                   if (imgUrl && (imgUrl.startsWith("data:image/") || imgUrl.startsWith("blob:"))) {
                     return (
-                      <div className="relative overflow-hidden rounded-xl border border-[#523d2e] bg-black/40 p-2 shadow-inner">
+                      <div className="relative overflow-hidden rounded-xl border border-slate-700 bg-slate-950 p-2 shadow-inner">
                         <img
                           src={imgUrl}
                           alt={selectedDocPreview.nomFichier}
                           className="max-h-72 w-full object-contain mx-auto rounded-lg shadow"
                         />
-                        <div className="mt-2 pt-1 border-t border-white/10 flex items-center justify-between text-[10px] text-amber-200/90 font-mono">
+                        <div className="mt-2 pt-1 border-t border-slate-800 flex items-center justify-between text-[10px] text-indigo-300 font-mono">
                           <span>Fichier: {selectedDocPreview.nomFichier}</span>
                           <span>Qualité OCR: {(selectedDocPreview.scoreFiabilite * 100).toFixed(0)}%</span>
                         </div>
@@ -575,10 +604,10 @@ export function DossiersPage() {
 
                   // Si le document est un PDF modèle ou sans photo scannée enregistrée
                   return (
-                    <div className="h-48 bg-[#281c14] rounded-xl border border-[#523d2e] flex flex-col items-center justify-center text-[#f7f4ed] p-4 space-y-2">
+                    <div className="h-48 bg-slate-950 rounded-xl border border-slate-800 flex flex-col items-center justify-center text-slate-100 p-4 space-y-2">
                       <span className="text-5xl">📄</span>
-                      <p className="text-xs font-bold text-[#f7f4ed]">{selectedDocPreview.nomFichier}</p>
-                      <span className="text-[10px] bg-[#3d2b1f] text-amber-200 px-3 py-1 rounded-full font-mono border border-[#523d2e]">
+                      <p className="text-xs font-bold text-slate-100">{selectedDocPreview.nomFichier}</p>
+                      <span className="text-[10px] bg-slate-800 text-indigo-300 px-3 py-1 rounded-full font-mono border border-slate-700">
                         ✓ Document Officiel Numérisé - Conforme SHA-256
                       </span>
                     </div>
@@ -587,14 +616,14 @@ export function DossiersPage() {
               </div>
 
               {/* CODE SHA-256 OFFICIEL */}
-              <div className="p-4 bg-[#3d2b1f] text-[#f7f4ed] rounded-2xl border border-[#523d2e] space-y-2 shadow-sm">
+              <div className="p-4 bg-slate-900 text-slate-100 rounded-2xl border border-slate-800 space-y-2 shadow-sm">
                 <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-bold text-amber-200 uppercase tracking-wider flex items-center gap-1.5">
+                  <span className="text-[11px] font-bold text-indigo-300 uppercase tracking-wider flex items-center gap-1.5">
                     <span>🔑</span> <span>Code Cryptographique SHA-256 Généré :</span>
                   </span>
-                  <span className="text-[9px] bg-[#281c14] text-[#f7f4ed] font-extrabold px-2 py-0.5 rounded-full border border-[#523d2e]">✓ AUTHENTIFIÉ ISO 27001</span>
+                  <span className="text-[9px] bg-emerald-950 text-emerald-400 font-extrabold px-2.5 py-0.5 rounded-full border border-emerald-800/60">✓ AUTHENTIFIÉ ISO 27001</span>
                 </div>
-                <div className="p-3 bg-[#281c14] rounded-xl border border-[#523d2e] font-mono text-xs text-amber-200 break-all font-bold tracking-wider select-all">
+                <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 font-mono text-xs text-indigo-300 break-all font-bold tracking-wider select-all">
                   {selectedDocPreview.hash}
                 </div>
               </div>
@@ -612,7 +641,7 @@ export function DossiersPage() {
             </div>
 
             <div className="flex justify-end pt-2">
-              <button onClick={() => setSelectedDocPreview(null)} className="px-6 py-2.5 bg-[#3d2b1f] text-[#f7f4ed] text-xs font-bold rounded-xl hover:bg-[#2c1e15] transition">
+              <button onClick={() => setSelectedDocPreview(null)} className="px-6 py-2.5 bg-slate-900 text-white text-xs font-bold rounded-xl hover:bg-slate-800 transition">
                 Fermer l'aperçu
               </button>
             </div>
@@ -621,15 +650,36 @@ export function DossiersPage() {
       )}
 
       {/* Feuille de décision officielle & Autorisation signée */}
-      {selectedSheetDossier && (
+      {selectedSheetDossier && receivedSignedDocuments.find((document) =>
+        document.id === selectedSheetDossier.numeroDossier || document.id === selectedSheetDossier.id
+      ) && (
         <OfficialPermissionSheet
           dossierId={selectedSheetDossier.numeroDossier || selectedSheetDossier.id}
           citoyenNom={selectedSheetDossier.citoyenNom}
           cni={selectedSheetDossier.citoyenCnie || "AI225"}
           titre={selectedSheetDossier.typeDemande}
-          dateSignature={selectedSheetDossier.dateCreation || "3 septembre 2026"}
-          agentNom={`${selectedSheetDossier.agentAffecte?.prenom || "Samira"} ${selectedSheetDossier.agentAffecte?.nom || "MANSOURI"} (Agent Habilité)`}
+          dateSignature={new Date(receivedSignedDocuments.find((document) =>
+            document.id === selectedSheetDossier.numeroDossier || document.id === selectedSheetDossier.id
+          )!.sentAt).toLocaleDateString("fr-FR", { year: "numeric", month: "long", day: "numeric" })}
+          signatureDataUrl={receivedSignedDocuments.find((document) =>
+            document.id === selectedSheetDossier.numeroDossier || document.id === selectedSheetDossier.id
+          )!.signatureDataUrl}
+          agentNom="Agent de Signature & Envoi"
           onClose={() => setSelectedSheetDossier(null)}
+        />
+      )}
+
+      {selectedSignedSheetDocument && (
+        <OfficialPermissionSheet
+          dossierId={selectedSignedSheetDocument.id}
+          citoyenNom={selectedSignedSheetDocument.citoyenNom}
+          cni={user?.cin || "AI225"}
+          titre={selectedSignedSheetDocument.title}
+          dateSignature={new Date(selectedSignedSheetDocument.sentAt).toLocaleDateString("fr-FR", { year: "numeric", month: "long", day: "numeric" })}
+          tsaTimestamp="2026-09-03T14:30:00Z [TSA-GOV-MA-SHA256]"
+          signatureDataUrl={selectedSignedSheetDocument.signatureDataUrl}
+          agentNom="Samira MANSOURI (Agent Signature & Envoi)"
+          onClose={() => setSelectedSignedSheetDocument(null)}
         />
       )}
 

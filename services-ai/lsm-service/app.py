@@ -438,6 +438,7 @@ SIGML_LEXICON = {
 }
 
 @app.post("/api/sign-language/translate-document", response_model=TranslateDocumentResponse)
+@app.post("/translate", response_model=TranslateDocumentResponse)
 async def translate_document_to_avatar_sigml(payload: TranslateDocumentRequest):
     """
     API officielle du service IA LSM / Avatar 3D :

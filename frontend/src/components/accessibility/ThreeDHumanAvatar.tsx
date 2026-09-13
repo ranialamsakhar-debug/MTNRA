@@ -4,6 +4,11 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 
 export type GestureMotionType =
+  | "salut-bienvenue"
+  | "explication-paumes"
+  | "reflexion-menton"
+  | "applaudissement"
+  | "pointage-direction"
   | "couronne"
   | "etoile"
   | "salut-solennel"
@@ -19,6 +24,16 @@ export type GestureMotionType =
   | "main-bouche"
   | "comptage-doigts"
   | "bras-croises"
+  | "mains-bas-ventre"
+  | "paumes-bas-ventre"
+  | "croisement-bas-ventre"
+  | "mains-sur-bouche"
+  | "main-poitrine"
+  | "doigt-verso-main"
+  | "mains-jointes"
+  | "index-paume"
+  | "frappe-poing-paume"
+  | "entrelacement-doigts"
   | "neutre";
 
 export type CameraPreset = "face" | "upper" | "full";
@@ -32,6 +47,9 @@ export interface ThreeDHumanAvatarProps {
   cameraPreset?: CameraPreset;
   showControls?: boolean;
   isFullWindow?: boolean;
+  sigmlXml?: string;
+  gestureIndex?: number;
+  gestureDurations?: number[];
 }
 
 interface ProfessionalPoseKeyframe {
@@ -46,184 +64,339 @@ interface ProfessionalPoseKeyframe {
 
 const PROF_POSES: Record<GestureMotionType, ProfessionalPoseKeyframe> = {
   neutre: {
-    headRot: [0.05, 0, 0],
-    leftArmRot: [-0.1, 0.2, -1.3], // Ventre / Bas
-    leftForearmRot: [-0.6, 0.1, 0.2],
-    leftWristRot: [0.1, 0.1, 0],
-    rightArmRot: [-0.1, -0.2, 1.3],
-    rightForearmRot: [-0.6, -0.1, -0.2],
-    rightWristRot: [0.1, -0.1, 0],
-  },
-  "main-bouche": { // Toucher de la bouche / Lèvres (Niveau Visage / Haut)
-    headRot: [0.05, 0, 0],
-    leftArmRot: [-0.1, 0.2, -1.3],
-    leftForearmRot: [-0.6, 0, 0],
-    leftWristRot: [0, 0, 0],
-    rightArmRot: [-0.8, -0.2, 0.5],
-    rightForearmRot: [-2.1, -0.2, 0.3], // Main portée directement à la bouche
-    rightWristRot: [-0.2, 0.4, -0.2],
-  },
-  "comptage-doigts": { // Comptage des doigts (Niveau Ventre / Bas)
-    headRot: [0.12, 0, 0],
-    leftArmRot: [-0.2, 0.4, -1.1], // Paume gauche ouverte au niveau du ventre
-    leftForearmRot: [-0.9, 0.4, 0.5],
+    headRot: [0.02, 0, 0],
+    leftArmRot: [-0.15, 0.35, 0.85], // Mains posées naturellement sur les hanches/côtés
+    leftForearmRot: [-1.35, 0.4, 0.5],
     leftWristRot: [0.3, 0.2, 0],
-    rightArmRot: [-0.3, -0.2, 1.0], // Main droite énumérant les doigts
-    rightForearmRot: [-1.0, -0.3, -0.3],
-    rightWristRot: [0.2, -0.2, 0],
+    rightArmRot: [-0.15, -0.35, -0.85], // Mains posées naturellement sur les hanches/côtés
+    rightForearmRot: [-1.35, -0.4, -0.5],
+    rightWristRot: [0.3, -0.2, 0],
   },
-  "bras-croises": { // Bras croisés sur le torse (Niveau Poitrine / Milieu)
-    headRot: [0, 0, 0],
-    leftArmRot: [-0.6, 0.5, -0.6], // Bras gauche croisé sous bras droit
-    leftForearmRot: [-1.8, 0.5, 0.4],
-    leftWristRot: [0.2, 0, 0],
-    rightArmRot: [-0.6, -0.5, 0.6], // Bras droit croisé au-dessus
-    rightForearmRot: [-1.8, -0.5, -0.4],
-    rightWristRot: [0.2, 0, 0],
-  },
-  couronne: { // Haut / Tête
-    headRot: [0.1, 0, 0],
-    leftArmRot: [-0.6, 0.4, -0.8],
-    leftForearmRot: [-1.6, 0.2, 0.3],
-    leftWristRot: [-0.2, 0.3, 0],
-    rightArmRot: [-0.6, -0.4, 0.8],
-    rightForearmRot: [-1.6, -0.2, -0.3],
-    rightWristRot: [-0.2, -0.3, 0],
-  },
-  etoile: { // Poitrine / Milieu
-    headRot: [0.05, 0.1, 0],
-    leftArmRot: [-0.1, 0.2, -1.3],
-    leftForearmRot: [-0.6, 0, 0],
+  "salut-bienvenue": {
+    headRot: [0.08, 0.1, 0],
+    leftArmRot: [0.1, 0.1, 1.25],
+    leftForearmRot: [0.2, 0, 0],
     leftWristRot: [0, 0, 0],
-    rightArmRot: [-0.5, -0.5, 0.9],
-    rightForearmRot: [-1.5, -0.3, -0.2],
-    rightWristRot: [0.2, -0.2, 0.1],
-  },
-  "salut-solennel": { // Haut / Front
-    headRot: [0.05, -0.1, 0],
-    leftArmRot: [-0.1, 0.2, -1.3],
-    leftForearmRot: [-0.6, 0, 0],
-    leftWristRot: [0, 0, 0],
-    rightArmRot: [-0.7, -0.4, 0.7],
-    rightForearmRot: [-1.8, -0.2, 0.1],
-    rightWristRot: [0.1, 0.2, -0.1],
-  },
-  "tampon-main": { // Poitrine / Milieu
-    headRot: [0.12, 0, 0],
-    leftArmRot: [-0.4, 0.4, -1.0],
-    leftForearmRot: [-1.4, 0.4, 0.5],
-    leftWristRot: [0.3, 0.2, 0],
-    rightArmRot: [-0.6, -0.3, 0.9],
-    rightForearmRot: [-1.5, -0.2, -0.3],
-    rightWristRot: [-0.4, 0, 0],
-  },
-  "livre-ouvert": { // Ventre / Bas
-    headRot: [0.1, 0, 0],
-    leftArmRot: [-0.2, 0.3, -1.1], // Présentation du document au niveau du ventre
-    leftForearmRot: [-0.9, 0.3, 0.4],
-    leftWristRot: [0.2, -0.3, 0],
-    rightArmRot: [-0.2, -0.3, 1.1],
-    rightForearmRot: [-0.9, -0.3, -0.4],
-    rightWristRot: [0.2, 0.3, 0],
-  },
-  "pouce-haut": { // Poitrine / Milieu
-    headRot: [0.05, 0.1, 0],
-    leftArmRot: [-0.1, 0.2, -1.3],
-    leftForearmRot: [-0.6, 0, 0],
-    leftWristRot: [0, 0, 0],
-    rightArmRot: [-0.5, -0.3, 1.0],
-    rightForearmRot: [-1.4, 0, 0],
-    rightWristRot: [0.3, 0.2, 0.2],
-  },
-  "demande-soumettre": { // Ventre vers Poitrine
-    headRot: [0.08, 0, 0],
-    leftArmRot: [-0.3, 0.2, -1.1],
-    leftForearmRot: [-1.0, 0.2, 0.2],
-    leftWristRot: [0.3, -0.2, 0],
-    rightArmRot: [-0.3, -0.2, 1.1],
-    rightForearmRot: [-1.0, -0.2, -0.2],
-    rightWristRot: [0.3, 0.2, 0],
-  },
-  "main-coeur": { // Poitrine / Cœur
-    headRot: [0.08, -0.1, 0],
-    leftArmRot: [-0.1, 0.2, -1.3],
-    leftForearmRot: [-0.6, 0, 0],
-    leftWristRot: [0, 0, 0],
-    rightArmRot: [-0.5, 0.2, 0.8],
-    rightForearmRot: [-1.6, -0.4, 0.3],
+    rightArmRot: [-0.4, 0.2, -0.6],
+    rightForearmRot: [-1.2, 0.2, 0.2],
     rightWristRot: [0.1, 0.2, 0],
   },
-  "v-victoire": { // Poitrine vers Haut
-    headRot: [0.05, 0, 0.05],
-    leftArmRot: [-0.1, 0.2, -1.3],
-    leftForearmRot: [-0.6, 0, 0],
+  "explication-paumes": {
+    headRot: [0.05, 0, 0],
+    leftArmRot: [-0.2, 0.4, 0.75],
+    leftForearmRot: [-0.9, 0.2, 0.2],
+    leftWristRot: [0.2, -0.1, 0],
+    rightArmRot: [-0.2, -0.4, -0.75],
+    rightForearmRot: [-0.9, -0.2, -0.2],
+    rightWristRot: [0.2, 0.1, 0],
+  },
+  "reflexion-menton": {
+    headRot: [0.15, -0.12, 0],
+    leftArmRot: [-0.5, 0.6, 0.4],
+    leftForearmRot: [-1.6, 0.4, 0.3],
+    leftWristRot: [0.1, 0, 0],
+    rightArmRot: [-1.15, 0.35, 0.05], // Doigts touchant directement le menton
+    rightForearmRot: [-2.35, -0.3, 0.35],
+    rightWristRot: [-0.35, 0.45, -0.15],
+  },
+  applaudissement: {
+    headRot: [0.05, 0, 0],
+    leftArmRot: [-0.4, 0.3, 0.4],
+    leftForearmRot: [-1.4, 0.2, 0.3],
+    leftWristRot: [0.1, 0.1, 0],
+    rightArmRot: [-0.4, -0.3, -0.4],
+    rightForearmRot: [-1.4, -0.2, -0.3],
+    rightWristRot: [0.1, -0.1, 0],
+  },
+  "pointage-direction": {
+    headRot: [0.05, 0.15, 0],
+    leftArmRot: [0.1, 0.1, 1.25],
+    leftForearmRot: [0.2, 0, 0],
     leftWristRot: [0, 0, 0],
-    rightArmRot: [-0.6, -0.3, 0.8],
-    rightForearmRot: [-1.5, 0, 0],
+    rightArmRot: [-0.5, -0.3, -0.5],
+    rightForearmRot: [-0.9, 0.1, -0.1],
+    rightWristRot: [0.2, -0.1, 0],
+  },
+  "main-bouche": {
+    headRot: [0.1, 0, 0],
+    leftArmRot: [0.1, 0.1, 1.25],
+    leftForearmRot: [0.2, 0, 0],
+    leftWristRot: [0, 0, 0],
+    rightArmRot: [-1.25, 0.45, 0.1], // Doigts touchant directement les lèvres/bouche
+    rightForearmRot: [-2.5, -0.3, 0.4],
+    rightWristRot: [-0.4, 0.5, -0.2],
+  },
+  "comptage-doigts": {
+    headRot: [0.1, 0, 0],
+    leftArmRot: [-0.2, 0.3, 0.6],
+    leftForearmRot: [-1.0, 0.3, 0.3],
+    leftWristRot: [0.2, 0.1, 0],
+    rightArmRot: [-0.3, -0.2, -0.5],
+    rightForearmRot: [-1.1, -0.2, -0.2],
+    rightWristRot: [0.2, -0.1, 0],
+  },
+  "bras-croises": {
+    headRot: [0, 0, 0],
+    leftArmRot: [-0.65, 0.65, 0.35], // Bras croisés naturellement sur le torse pendant la parole
+    leftForearmRot: [-1.95, 0.45, 0.35],
+    leftWristRot: [0.2, 0, 0],
+    rightArmRot: [-0.65, -0.65, -0.35], // Bras croisés naturellement sur le torse pendant la parole
+    rightForearmRot: [-1.95, -0.45, -0.35],
+    rightWristRot: [0.2, 0, 0],
+  },
+  "mains-bas-ventre": {
+    headRot: [0.03, 0, 0],
+    leftArmRot: [-0.3, 0.45, 0.45], // Mains jointes et posées bas au niveau du ventre
+    leftForearmRot: [-0.95, 0.35, 0.3],
+    leftWristRot: [0.25, 0.2, 0],
+    rightArmRot: [-0.3, -0.45, -0.45], // Mains jointes et posées bas au niveau du ventre
+    rightForearmRot: [-0.95, -0.35, -0.3],
+    rightWristRot: [0.25, -0.2, 0],
+  },
+  "paumes-bas-ventre": {
+    headRot: [0.04, 0.05, 0],
+    leftArmRot: [-0.25, 0.4, 0.5], // Paumes ouvertes gesturing bas à hauteur du ventre
+    leftForearmRot: [-0.8, 0.2, 0.2],
+    leftWristRot: [0.3, -0.1, 0],
+    rightArmRot: [-0.25, -0.4, -0.5], // Paumes ouvertes gesturing bas à hauteur du ventre
+    rightForearmRot: [-0.8, -0.2, -0.2],
+    rightWristRot: [0.3, 0.1, 0],
+  },
+  "croisement-bas-ventre": {
+    headRot: [0.02, -0.05, 0],
+    leftArmRot: [-0.2, 0.5, 0.4], // Mains superposées doucement sous le nombril / niveau ventre
+    leftForearmRot: [-1.05, 0.3, 0.25],
+    leftWristRot: [0.2, 0.1, 0],
+    rightArmRot: [-0.2, -0.5, -0.4], // Mains superposées doucement sous le nombril / niveau ventre
+    rightForearmRot: [-1.05, -0.3, -0.25],
+    rightWristRot: [0.2, -0.1, 0],
+  },
+  couronne: {
+    headRot: [0.08, 0, 0],
+    leftArmRot: [-0.6, 0.3, 0.1],
+    leftForearmRot: [-1.4, 0.2, 0.2],
+    leftWristRot: [-0.1, 0.2, 0],
+    rightArmRot: [-0.6, -0.3, -0.1],
+    rightForearmRot: [-1.4, -0.2, -0.2],
+    rightWristRot: [-0.1, -0.2, 0],
+  },
+  etoile: {
+    headRot: [0.05, 0.1, 0],
+    leftArmRot: [0.1, 0.1, 1.25],
+    leftForearmRot: [0.2, 0, 0],
+    leftWristRot: [0, 0, 0],
+    rightArmRot: [-0.4, -0.4, -0.5],
+    rightForearmRot: [-1.2, -0.2, -0.1],
+    rightWristRot: [0.2, -0.1, 0],
+  },
+  "salut-solennel": {
+    headRot: [0.05, -0.1, 0],
+    leftArmRot: [0.1, 0.1, 1.25],
+    leftForearmRot: [0.2, 0, 0],
+    leftWristRot: [0, 0, 0],
+    rightArmRot: [-0.6, -0.3, -0.3],
+    rightForearmRot: [-1.6, -0.1, 0.1],
+    rightWristRot: [0.1, 0.1, 0],
+  },
+  "tampon-main": {
+    headRot: [0.1, 0, 0],
+    leftArmRot: [-0.3, 0.3, 0.5],
+    leftForearmRot: [-1.2, 0.3, 0.3],
+    leftWristRot: [0.2, 0.1, 0],
+    rightArmRot: [-0.5, -0.3, -0.4],
+    rightForearmRot: [-1.3, -0.2, -0.2],
+    rightWristRot: [-0.3, 0, 0],
+  },
+  "livre-ouvert": {
+    headRot: [0.08, 0, 0],
+    leftArmRot: [-0.2, 0.3, 0.6],
+    leftForearmRot: [-0.9, 0.3, 0.3],
+    leftWristRot: [0.2, -0.2, 0],
+    rightArmRot: [-0.2, -0.3, -0.6],
+    rightForearmRot: [-0.9, -0.3, -0.3],
+    rightWristRot: [0.2, 0.2, 0],
+  },
+  "pouce-haut": {
+    headRot: [0.05, 0.1, 0],
+    leftArmRot: [0.1, 0.1, 1.25],
+    leftForearmRot: [0.2, 0, 0],
+    leftWristRot: [0, 0, 0],
+    rightArmRot: [-0.4, -0.2, -0.5],
+    rightForearmRot: [-1.2, 0, 0],
+    rightWristRot: [0.2, 0.1, 0],
+  },
+  "demande-soumettre": {
+    headRot: [0.06, 0, 0],
+    leftArmRot: [-0.3, 0.2, 0.5],
+    leftForearmRot: [-0.9, 0.2, 0.2],
+    leftWristRot: [0.2, -0.1, 0],
+    rightArmRot: [-0.3, -0.2, -0.5],
+    rightForearmRot: [-0.9, -0.2, -0.2],
+    rightWristRot: [0.2, 0.1, 0],
+  },
+  "main-coeur": {
+    headRot: [0.06, -0.1, 0],
+    leftArmRot: [0.1, 0.1, 1.25],
+    leftForearmRot: [0.2, 0, 0],
+    leftWristRot: [0, 0, 0],
+    rightArmRot: [-0.4, 0.2, -0.3],
+    rightForearmRot: [-1.4, -0.3, 0.2],
+    rightWristRot: [0.1, 0.1, 0],
+  },
+  "v-victoire": {
+    headRot: [0.05, 0, 0],
+    leftArmRot: [0.1, 0.1, 1.25],
+    leftForearmRot: [0.2, 0, 0],
+    leftWristRot: [0, 0, 0],
+    rightArmRot: [-0.5, -0.2, -0.4],
+    rightForearmRot: [-1.2, 0, 0],
     rightWristRot: [0.1, 0, 0],
   },
-  "sceau-droit": { // Poitrine
-    headRot: [0.1, 0, 0],
-    leftArmRot: [-0.4, 0.3, -1.0],
-    leftForearmRot: [-1.4, 0.3, 0.4],
+  "sceau-droit": {
+    headRot: [0.08, 0, 0],
+    leftArmRot: [-0.3, 0.3, 0.5],
+    leftForearmRot: [-1.2, 0.3, 0.3],
     leftWristRot: [0.2, 0, 0],
-    rightArmRot: [-0.6, -0.3, 0.9],
-    rightForearmRot: [-1.5, -0.2, -0.2],
-    rightWristRot: [0.3, -0.3, 0],
-  },
-  "ecriture-paume": { // Poitrine / Paume
-    headRot: [0.15, 0.1, 0],
-    leftArmRot: [-0.4, 0.3, -1.0],
-    leftForearmRot: [-1.4, 0.4, 0.4],
-    leftWristRot: [0.2, 0.1, 0],
-    rightArmRot: [-0.5, -0.3, 0.9],
-    rightForearmRot: [-1.6, -0.3, -0.3],
-    rightWristRot: [0.2, -0.4, 0.1],
-  },
-  "clock-tsa": { // Poitrine / Poignet
-    headRot: [0.1, -0.15, 0],
-    leftArmRot: [-0.4, 0.3, -1.0],
-    leftForearmRot: [-1.4, 0.4, 0.4],
-    leftWristRot: [0.3, 0.3, 0],
-    rightArmRot: [-0.5, -0.2, 0.9],
-    rightForearmRot: [-1.6, -0.3, -0.2],
+    rightArmRot: [-0.5, -0.3, -0.4],
+    rightForearmRot: [-1.3, -0.2, -0.2],
     rightWristRot: [0.2, -0.2, 0],
+  },
+  "ecriture-paume": {
+    headRot: [0.12, 0.1, 0],
+    leftArmRot: [-0.3, 0.3, 0.5],
+    leftForearmRot: [-1.3, 0.3, 0.3],
+    leftWristRot: [0.2, 0.1, 0],
+    rightArmRot: [-0.4, -0.3, -0.4],
+    rightForearmRot: [-1.4, -0.2, -0.2],
+    rightWristRot: [0.2, -0.3, 0.1],
+  },
+  "clock-tsa": {
+    headRot: [0.08, -0.1, 0],
+    leftArmRot: [-0.3, 0.3, 0.5],
+    leftForearmRot: [-1.3, 0.3, 0.3],
+    leftWristRot: [0.2, 0.2, 0],
+    rightArmRot: [-0.4, -0.2, -0.4],
+    rightForearmRot: [-1.4, -0.2, -0.2],
+    rightWristRot: [0.2, -0.1, 0],
+  },
+  // Les deux mains couvrant la bouche — surprise / silence / émotion forte
+  "mains-sur-bouche": {
+    headRot: [0.1, 0, 0],
+    leftArmRot: [-1.05, 0.35, 0.15], // Bras gauche levé vers le visage
+    leftForearmRot: [-2.3, -0.25, 0.35],
+    leftWristRot: [-0.3, 0.4, -0.15],
+    rightArmRot: [-1.05, -0.35, -0.15], // Bras droit levé en miroir vers le visage
+    rightForearmRot: [-2.3, 0.25, -0.35],
+    rightWristRot: [-0.3, -0.4, 0.15],
+  },
+  // Main droite posée à plat sur la poitrine — sincérité / engagement / émotion
+  "main-poitrine": {
+    headRot: [0.08, -0.08, 0],
+    leftArmRot: [-0.15, 0.35, 0.85], // Bras gauche au repos naturel
+    leftForearmRot: [-1.35, 0.4, 0.5],
+    leftWristRot: [0.3, 0.2, 0],
+    rightArmRot: [-0.55, -0.2, -0.3], // Main droite ramenée sur la poitrine
+    rightForearmRot: [-1.55, -0.15, 0.1],
+    rightWristRot: [0.2, -0.15, 0],
+  },
+  // Index droit touche le dos de la main gauche — signer ici, pointer un document, référence précise
+  "doigt-verso-main": {
+    headRot: [0.12, 0.05, 0],
+    leftArmRot: [-0.35, 0.12, 0.30], // Main gauche paume vers le bas, tenue à plat devant soi
+    leftForearmRot: [-1.0, 0.10, 0.10],
+    leftWristRot: [0.30, 0.10, 0],
+    rightArmRot: [-0.42, -0.08, -0.28], // Index droit vient pointer/toucher le dos de la main gauche
+    rightForearmRot: [-1.15, -0.10, -0.05],
+    rightWristRot: [0.10, -0.15, 0],
+  },
+  // Les deux mains jointes devant soi, paumes rapprochées — accord, alliance, engagement officiel
+  "mains-jointes": {
+    headRot: [0.06, 0, 0],
+    leftArmRot: [-0.60, 0.15, 0.28], // Bras gauche ramené vers le centre
+    leftForearmRot: [-1.50, 0.08, 0.10],
+    leftWristRot: [0.10, -0.05, 0],
+    rightArmRot: [-0.60, -0.15, -0.28], // Bras droit ramené en miroir vers le centre
+    rightForearmRot: [-1.50, -0.08, -0.10],
+    rightWristRot: [0.10, 0.05, 0],
+  },
+  // Index droit pointé dans la paume gauche ouverte — indiquer un article, une référence légale
+  "index-paume": {
+    headRot: [0.10, 0.08, 0],
+    leftArmRot: [-0.32, 0.14, 0.32], // Paume gauche ouverte et tournée vers le haut
+    leftForearmRot: [-0.88, 0.14, 0.14],
+    leftWristRot: [0.42, -0.10, 0],
+    rightArmRot: [-0.48, -0.06, -0.26], // Index droit vise le centre de la paume gauche
+    rightForearmRot: [-1.30, -0.10, -0.10],
+    rightWristRot: [-0.10, -0.20, 0],
+  },
+  // Poing droit frappe la paume gauche — emphase forte, décision, validation
+  "frappe-poing-paume": {
+    headRot: [0.10, 0, 0],
+    leftArmRot: [-0.50, 0.14, 0.30], // Paume gauche tendue et ouverte pour recevoir
+    leftForearmRot: [-1.30, 0.10, 0.14],
+    leftWristRot: [0.16, 0.10, 0],
+    rightArmRot: [-0.50, -0.14, -0.26], // Poing droit ramassé, prêt à frapper la paume
+    rightForearmRot: [-1.26, -0.10, -0.10],
+    rightWristRot: [0.0, -0.10, 0],
+  },
+  // Doigts des deux mains entrelacés devant soi — solidarité, unité, lien officiel
+  "entrelacement-doigts": {
+    headRot: [0.07, 0, 0],
+    leftArmRot: [-0.56, 0.10, 0.24], // Bras gauche très proche du centre
+    leftForearmRot: [-1.46, 0.05, 0.10],
+    leftWristRot: [0.10, 0, 0],
+    rightArmRot: [-0.56, -0.10, -0.24], // Bras droit en miroir, mains qui se rejoignent
+    rightForearmRot: [-1.46, -0.05, -0.10],
+    rightWristRot: [0.10, 0, 0],
   },
 };
 
 const DEFAULT_RPM_MODEL = "https://models.readyplayer.me/6460d37574d568d784d6b631.glb";
 
 /**
- * Universal H-Anim ↔ Avaturn / ReadyPlayerMe / Mixamo Cross-Mapping Dictionary
+ * Universal H-Anim ↔ Avaturn / ReadyPlayerMe / Mixamo / VRM Cross-Mapping Dictionary
  */
 const HANIM_BONE_ALIASES: Record<string, string[]> = {
-  head: ["vc4", "vc1", "skull", "Head", "head", "mixamorigHead", "Bip01_Head"],
-  neck: ["vc7", "neck", "Neck", "mixamorigNeck", "Bip01_Neck"],
-  spine: ["vt6", "vt12", "vl5", "spine", "Spine", "Spine1", "Spine2", "mixamorigSpine", "mixamorigSpine1", "mixamorigSpine2"],
-  leftShoulder: ["l_shoulder", "l_clavicle", "LeftShoulder", "leftShoulder", "mixamorigLeftShoulder"],
-  leftArm: ["l_arm", "l_upperarm", "LeftArm", "LeftUpperArm", "leftArm", "mixamorigLeftArm"],
-  leftForearm: ["l_elbow", "l_forearm", "l_lowerarm", "LeftForeArm", "LeftLowerArm", "leftForeArm", "mixamorigLeftForeArm"],
-  leftWrist: ["l_wrist", "l_hand", "LeftHand", "leftHand", "mixamorigLeftHand"],
-  rightShoulder: ["r_shoulder", "r_clavicle", "RightShoulder", "rightShoulder", "mixamorigRightShoulder"],
-  rightArm: ["r_arm", "r_upperarm", "RightArm", "RightUpperArm", "rightArm", "mixamorigRightArm"],
-  rightForearm: ["r_elbow", "r_forearm", "r_lowerarm", "RightForeArm", "RightLowerArm", "rightForeArm", "mixamorigRightForeArm"],
-  rightWrist: ["r_wrist", "r_hand", "RightHand", "rightHand", "mixamorigRightHand"],
+  head: ["vc4", "vc1", "skull", "Head", "head", "mixamorigHead", "mixamorig:Head", "Bip01_Head", "J_Bip_C_Head"],
+  neck: ["vc7", "neck", "Neck", "mixamorigNeck", "mixamorig:Neck", "Bip01_Neck", "J_Bip_C_Neck"],
+  spine: ["vt6", "vt12", "vl5", "spine", "Spine", "Spine1", "Spine2", "mixamorigSpine", "mixamorig:Spine", "mixamorigSpine1", "mixamorigSpine2", "J_Bip_C_Spine"],
+  leftShoulder: ["l_shoulder", "l_clavicle", "LeftShoulder", "leftShoulder", "mixamorigLeftShoulder", "mixamorig:LeftShoulder", "Clavicle_L", "Shoulder_L", "J_Bip_L_Shoulder"],
+  leftArm: ["l_arm", "l_upperarm", "LeftArm", "LeftUpperArm", "leftArm", "mixamorigLeftArm", "mixamorig:LeftArm", "mixamorigLeftUpperArm", "mixamorig:LeftUpperArm", "UpperArm_L", "Arm_L", "J_Bip_L_UpperArm"],
+  leftForearm: ["l_elbow", "l_forearm", "l_lowerarm", "LeftForeArm", "LeftLowerArm", "leftForeArm", "mixamorigLeftForeArm", "mixamorig:LeftForeArm", "mixamorigLeftLowerArm", "mixamorig:LeftLowerArm", "LowerArm_L", "Forearm_L", "J_Bip_L_LowerArm"],
+  leftWrist: ["l_wrist", "l_hand", "LeftHand", "leftHand", "mixamorigLeftHand", "mixamorig:LeftHand", "Hand_L", "Wrist_L", "J_Bip_L_Hand"],
+  rightShoulder: ["r_shoulder", "r_clavicle", "RightShoulder", "rightShoulder", "mixamorigRightShoulder", "mixamorig:RightShoulder", "Clavicle_R", "Shoulder_R", "J_Bip_R_Shoulder"],
+  rightArm: ["r_arm", "r_upperarm", "RightArm", "RightUpperArm", "rightArm", "mixamorigRightArm", "mixamorig:RightArm", "mixamorigRightUpperArm", "mixamorig:RightUpperArm", "UpperArm_R", "Arm_R", "J_Bip_R_UpperArm"],
+  rightForearm: ["r_elbow", "r_forearm", "r_lowerarm", "RightForeArm", "RightLowerArm", "rightForeArm", "mixamorigRightForeArm", "mixamorig:RightForeArm", "mixamorigRightLowerArm", "mixamorig:RightLowerArm", "LowerArm_R", "Forearm_R", "J_Bip_R_LowerArm"],
+  rightWrist: ["r_wrist", "r_hand", "RightHand", "rightHand", "mixamorigRightHand", "mixamorig:RightHand", "Hand_R", "Wrist_R", "J_Bip_R_Hand"],
 };
+
+function cleanBoneName(name: string): string {
+  return name.toLowerCase().replace(/[:_\-.\s]/g, "");
+}
 
 /**
  * Resolves bone using H-Anim alias table with fuzzy string matching across Avaturn/Mixamo skeletons
  */
 function resolveHAnimBone(bones: Record<string, THREE.Object3D>, category: keyof typeof HANIM_BONE_ALIASES): THREE.Object3D | null {
   const aliases = HANIM_BONE_ALIASES[category] || [];
+  
+  // 1. Direct key match
   for (const alias of aliases) {
     if (bones[alias]) return bones[alias];
-    const lowerAlias = alias.toLowerCase();
-    for (const key of Object.keys(bones)) {
-      if (key.toLowerCase() === lowerAlias || key.toLowerCase().endsWith(lowerAlias)) {
-        return bones[key];
+  }
+  
+  // 2. Normalized match stripping punctuation and casing
+  const normalizedBoneKeys = Object.keys(bones).map((k) => ({ original: k, clean: cleanBoneName(k) }));
+  
+  for (const alias of aliases) {
+    const cleanAlias = cleanBoneName(alias);
+    for (const item of normalizedBoneKeys) {
+      if (item.clean === cleanAlias || item.clean.endsWith(cleanAlias)) {
+        return bones[item.original];
       }
     }
   }
+  
   return null;
 }
 
@@ -485,6 +658,29 @@ export const ThreeDHumanAvatar: React.FC<ThreeDHumanAvatarProps> = ({
 
       if (playing) {
         switch (currentMotion) {
+          case "salut-bienvenue":
+            trajX = Math.sin(gestureElapsed * 8.0) * 0.16 * articulation;
+            trajY = Math.cos(gestureElapsed * 4.0) * 0.06 * articulation;
+            facialSmile = 0.9;
+            facialBrow = 0.4;
+            break;
+          case "explication-paumes":
+            trajX = Math.sin(gestureElapsed * 3.5) * 0.18 * articulation;
+            trajZ = Math.cos(gestureElapsed * 3.5) * 0.10 * articulation;
+            facialMouthO = 0.3;
+            break;
+          case "reflexion-menton":
+            trajY = Math.sin(gestureElapsed * 2.5) * 0.04 * articulation;
+            facialBrow = 0.6;
+            break;
+          case "applaudissement":
+            trajX = Math.sin(gestureElapsed * 10.0) * 0.08 * articulation;
+            facialSmile = 0.8;
+            break;
+          case "pointage-direction":
+            trajZ = Math.sin(gestureElapsed * 4.0) * 0.14 * articulation;
+            facialBrow = 0.4;
+            break;
           case "main-bouche":
             // Cercle des deux mains et doigts interagissant directement devant la bouche
             trajX = Math.sin(gestureElapsed * 7.0) * 0.12 * articulation;
@@ -543,6 +739,55 @@ export const ThreeDHumanAvatar: React.FC<ThreeDHumanAvatarProps> = ({
           case "clock-tsa":
             trajY = Math.sin(gestureElapsed * 7.5) * 0.12 * articulation; // Tapotement rapide du poignet
             break;
+          case "mains-sur-bouche":
+            // Les deux mains montent vers la bouche en miroir — ébahissement / surprise / silence
+            trajY = Math.sin(gestureElapsed * 5.0) * 0.08 * articulation;
+            trajX = Math.cos(gestureElapsed * 5.0) * 0.04 * articulation;
+            facialBrow = 0.9; // Sourcils très levés (surprise)
+            facialMouthO = 0.6; // Bouche entrouverte
+            break;
+          case "main-poitrine":
+            // La main droite se pose sur le cœur / la poitrine — sincérité / promesse
+            trajY = Math.sin(gestureElapsed * 2.5) * 0.05 * articulation; // Léger battement sur la poitrine
+            trajZ = Math.cos(gestureElapsed * 2.5) * 0.03 * articulation;
+            facialBrow = 0.3;
+            facialSmile = 0.5; // Sourire sincère
+            break;
+          case "doigt-verso-main":
+            // Index droit qui pointe/tape le dos de la main gauche — signer, valider, pointer
+            trajY = Math.sin(gestureElapsed * 8.0) * 0.06 * articulation; // Petits tapotements verticaux de l'index
+            trajX = Math.cos(gestureElapsed * 8.0) * 0.02 * articulation;
+            facialBrow = 0.5;
+            facialMouthO = 0.2;
+            break;
+          case "mains-jointes":
+            // Mains jointes qui s'unissent — légère pression rythmique des paumes l'une contre l'autre
+            trajZ = Math.sin(gestureElapsed * 3.0) * 0.04 * articulation; // Micro-compression vers l'avant
+            trajY = Math.cos(gestureElapsed * 3.0) * 0.03 * articulation;
+            facialBrow = 0.3;
+            facialSmile = 0.6; // Sourire d'accord
+            break;
+          case "index-paume":
+            // Index qui désigne un point précis dans la paume ouverte — lire un article
+            trajY = Math.sin(gestureElapsed * 6.0) * 0.06 * articulation; // Index qui rebondit dans la paume
+            trajX = Math.sin(gestureElapsed * 3.0) * 0.03 * articulation;
+            facialBrow = 0.6;
+            facialMouthO = 0.25;
+            break;
+          case "frappe-poing-paume":
+            // Poing qui frappe la paume avec insistance — frappe énergique et répétée
+            trajY = Math.sin(gestureElapsed * 9.0) * 0.12 * articulation; // Frappe rythmée et nette
+            trajZ = Math.cos(gestureElapsed * 4.5) * 0.04 * articulation;
+            facialBrow = 0.85; // Sourcils contractés — emphase forte
+            facialMouthO = 0.4;
+            break;
+          case "entrelacement-doigts":
+            // Doigts entrelacés — micro-oscillation douce, comme serrer les mains dans ses propres mains
+            trajY = Math.sin(gestureElapsed * 2.0) * 0.03 * articulation;
+            trajX = Math.cos(gestureElapsed * 2.0) * 0.02 * articulation;
+            facialBrow = 0.2;
+            facialSmile = 0.4;
+            break;
           default:
             trajX = Math.sin(gestureElapsed * 2.0) * 0.03 * articulation;
             trajY = Math.cos(gestureElapsed * 2.0) * 0.02 * articulation;
@@ -582,13 +827,41 @@ export const ThreeDHumanAvatar: React.FC<ThreeDHumanAvatarProps> = ({
 
         // Curvatures des doigts pour un rendu ultra-naturel des mains en langue des signes
         const FINGER_BONE_PATTERNS = ["Index", "Middle", "Ring", "Pinky", "Thumb"];
-        const SIDES = ["RightHand", "LeftHand"];
-        SIDES.forEach((side) => {
+        const SIDES = [
+          { name: "RightHand", prefixes: ["RightHand", "mixamorigRightHand", "mixamorig:RightHand", "r_", "Right", "Hand_R"] },
+          { name: "LeftHand", prefixes: ["LeftHand", "mixamorigLeftHand", "mixamorig:LeftHand", "l_", "Left", "Hand_L"] },
+        ];
+        SIDES.forEach(({ prefixes }) => {
           FINGER_BONE_PATTERNS.forEach((finger) => {
             for (let seg = 1; seg <= 3; seg++) {
-              const boneName = `${side}${finger}${seg}`;
-              const altBoneName = `mixamorig${side}${finger}${seg}`;
-              const bone = gltfBones[boneName] || gltfBones[altBoneName];
+              let bone: THREE.Object3D | null = null;
+              for (const pref of prefixes) {
+                const candidates = [
+                  `${pref}${finger}${seg}`,
+                  `${pref}_${finger.toLowerCase()}_${seg}`,
+                  `${pref}${finger.toLowerCase()}${seg}`,
+                  `${pref}_${finger}_${seg}`,
+                ];
+                for (const cand of candidates) {
+                  if (gltfBones[cand]) {
+                    bone = gltfBones[cand];
+                    break;
+                  }
+                }
+                if (bone) break;
+              }
+
+              if (!bone) {
+                // Fallback avec cleanBoneName
+                const targetClean = cleanBoneName(`${prefixes[0]}${finger}${seg}`);
+                for (const key of Object.keys(gltfBones)) {
+                  if (cleanBoneName(key).endsWith(targetClean)) {
+                    bone = gltfBones[key];
+                    break;
+                  }
+                }
+              }
+
               if (bone && initialQuaternions[bone.name]) {
                 const restQ = initialQuaternions[bone.name];
                 const flexAngle = (finger === "Thumb" ? -0.2 : (seg === 1 ? -0.35 : -0.45)) * poseBlend;
@@ -678,21 +951,6 @@ export const ThreeDHumanAvatar: React.FC<ThreeDHumanAvatarProps> = ({
               <span>📥</span>
               <span>{userFileName ? `Avatar : ${userFileName.slice(0, 18)}` : "Charger mon Fichier Avatar Avaturn (.GLB)"}</span>
             </button>
-          </div>
-
-          <div className="flex items-center gap-1.5 bg-slate-950 p-1 rounded-xl border border-slate-800">
-            <span className="text-[10px] text-slate-400 font-bold px-2 uppercase">📷 Caméra :</span>
-            {(["face", "upper", "full"] as const).map((preset) => (
-              <button
-                key={preset}
-                onClick={() => setActiveCamPreset(preset)}
-                className={`px-3 py-1.5 rounded-lg font-bold transition cursor-pointer ${
-                  activeCamPreset === preset ? "bg-amber-500 text-slate-950 shadow" : "text-slate-400 hover:text-white"
-                }`}
-              >
-                {preset === "face" ? "Visage" : preset === "upper" ? "Buste (Signes)" : "Plein Pied"}
-              </button>
-            ))}
           </div>
         </div>
       )}

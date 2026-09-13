@@ -1,11 +1,20 @@
 package ma.tifawin.x0.modules.dossier.controller;
 
+import java.time.LocalDate;
+import java.util.List;
+
+import lombok.RequiredArgsConstructor;
+import ma.tifawin.x0.features.agent.service.MediateurDisponibiliteService;
+import ma.tifawin.x0.features.agent.dto.MediateurPropositionDto;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/responsable-service")
+@RequiredArgsConstructor
 public class ResponsableServiceController {
+
+    private final MediateurDisponibiliteService mediateurDisponibiliteService;
 
     @GetMapping("/litiges")
     public ResponseEntity<String> getLitiges() { return ResponseEntity.ok("TODO"); }
@@ -24,6 +33,12 @@ public class ResponsableServiceController {
 
     @GetMapping("/statistiques")
     public ResponseEntity<String> getStats() { return ResponseEntity.ok("TODO"); }
+
+    @GetMapping("/mediateurs/propositions")
+    public ResponseEntity<List<MediateurPropositionDto>> proposerMediateurs(
+            @RequestParam LocalDate date) {
+        return ResponseEntity.ok( mediateurDisponibiliteService.proposer(date));
+    }
 
     @GetMapping("/creneaux")
     public ResponseEntity<String> getCreneaux() { return ResponseEntity.ok("TODO"); }

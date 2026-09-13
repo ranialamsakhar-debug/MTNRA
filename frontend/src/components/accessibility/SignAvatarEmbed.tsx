@@ -11,12 +11,12 @@ interface SignAvatarEmbedProps {
  */
 export const SignAvatarEmbed: React.FC<SignAvatarEmbedProps> = ({
   documentText,
-  signStandard = "LSF",
+  signStandard = "ASL",
 }) => {
   const [iframeLoaded, setIframeLoaded] = useState(false);
 
   // Encode document text for SignAvatar.org query parameters
-  const encodedText = encodeURIComponent(documentText.slice(0, 500));
+  const encodedText = encodeURIComponent(documentText.slice(0, 2000));
   const signAvatarUrl = `https://www.signavatar.org/?text=${encodedText}&lang=${signStandard.toLowerCase()}`;
 
   return (

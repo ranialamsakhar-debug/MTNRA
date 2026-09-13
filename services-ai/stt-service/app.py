@@ -61,6 +61,7 @@ def transcode_with_whisper(audio_bytes: bytes, filename: str, language: Optional
 
 
 @app.post("/api/voice/transcribe", response_model=STTResponse)
+@app.post("/transcribe", response_model=STTResponse)
 async def transcribe(
     file: UploadFile = File(...),
     language: str = Form("fr"),

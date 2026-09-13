@@ -1,4 +1,5 @@
 import { useState } from "react";
+import ReactDOM from "react-dom";
 import { motion } from "framer-motion";
 import { EchoTalkSignModal } from "../accessibility/EchoTalkSignModal";
 
@@ -45,12 +46,13 @@ Décision Administrative d'Autorisation Officielle N° ${dossierId}. Date: ${dat
 ARTICLE 1ER — ACCEPTATION ET AUTORISATION DÉFINITIVE: La demande déposée par ${citoyenNom} (CNI: ${cni}) concernant « ${titre} » est déclarée DÉFINITIVEMENT ACCEPTÉE ET APPROUVÉE.
 ARTICLE 2 — DROITS ET EFFETS JURIDIQUES: Le présent acte vaut autorisation légale d'exécution. Horodatage TSA: ${tsaTimestamp}.`;
 
-  return (
+  return ReactDOM.createPortal(
     <div className="fixed inset-0 z-[99999] overflow-y-auto p-4 md:p-6 bg-slate-900/80 backdrop-blur-md font-sans print:p-0 print:bg-white flex justify-center items-start">
       <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
+        initial={{ opacity: 1, scale: 0.97 }}
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.95 }}
+        transition={{ duration: 0.15 }}
         className="bg-white rounded-3xl max-w-3xl w-full shadow-2xl border border-slate-200 overflow-hidden my-6 md:my-10 print:my-0 print:shadow-none print:border-none print:w-full print:max-w-none relative"
       >
         {/* Barre d'outils supérieure fixe (Sticky) avec boutons Télécharger PDF, Avatar Echo 1.0 et Fermer */}
@@ -270,6 +272,7 @@ ARTICLE 2 — DROITS ET EFFETS JURIDIQUES: Le présent acte vaut autorisation l�
           content: documentContentText,
         }}
       />
-    </div>
+    </div>,
+    document.body
   );
 }

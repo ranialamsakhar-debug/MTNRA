@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { convertDocumentToSiGML, SiGMLConversionResult, SiGMLItem } from "../../services/sigmlConverter";
+import { validateKnownSigns, validateSiGMLSign } from "../../services/animgenEngine";
 import { ThreeDHumanAvatar, GestureMotionType, CameraPreset } from "./ThreeDHumanAvatar";
 
 interface AiSignAvatarEngineProps {
@@ -12,6 +13,11 @@ interface AiSignAvatarEngineProps {
 }
 
 const MOTION_LIST: GestureMotionType[] = [
+  "salut-bienvenue",
+  "explication-paumes",
+  "reflexion-menton",
+  "applaudissement",
+  "pointage-direction",
   "couronne",
   "etoile",
   "salut-solennel",
@@ -27,6 +33,34 @@ const MOTION_LIST: GestureMotionType[] = [
   "main-bouche",
   "comptage-doigts",
   "bras-croises",
+  "mains-bas-ventre",
+  "paumes-bas-ventre",
+  "croisement-bas-ventre",
+  "mains-sur-bouche",
+  "main-poitrine",
+  "doigt-verso-main",
+  "mains-jointes",
+  "index-paume",
+  "frappe-poing-paume",
+  "entrelacement-doigts",
+];
+
+const DACTYLO_MOTION_LIST: GestureMotionType[] = [
+  "salut-bienvenue",
+  "explication-paumes",
+  "reflexion-menton",
+  "mains-bas-ventre",
+  "paumes-bas-ventre",
+  "croisement-bas-ventre",
+  "applaudissement",
+  "pointage-direction",
+  "comptage-doigts",
+  "etoile",
+  "livre-ouvert",
+  "ecriture-paume",
+  "clock-tsa",
+  "main-coeur",
+  "demande-soumettre",
 ];
 
 /**
@@ -41,6 +75,12 @@ function mapGlossToMotion(gloss: string, index: number = 0): GestureMotionType {
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "");
 
+  if (norm.includes("BONJOUR") || norm.includes("SALUT") || norm.includes("BIENVENUE") || norm.includes("ACCUEIL")) return "salut-bienvenue";
+  if (norm.includes("MERCI") || norm.includes("EXPLIC") || norm.includes("INFORM") || norm.includes("PRESENT") || norm.includes("PAUME") || norm.includes("COTE")) return "explication-paumes";
+  if (norm.includes("BOUCHE") || norm.includes("PAROLE") || norm.includes("DECRET") || norm.includes("SECRET") || norm.includes("VOIX") || norm.includes("MENTON")) return "main-bouche";
+  if (norm.includes("QUESTION") || norm.includes("REFLEX") || norm.includes("ETUDE") || norm.includes("ANALYSE")) return "reflexion-menton";
+  if (norm.includes("BRAVO") || norm.includes("APPLAUD") || norm.includes("FELICIT") || norm.includes("SUCCES")) return "applaudissement";
+  if (norm.includes("SERVICE") || norm.includes("ORIENT") || norm.includes("DIRECT") || norm.includes("POINT")) return "pointage-direction";
   if (norm.includes("ROYAUME")) return "couronne";
   if (norm.includes("MAROC")) return "etoile";
   if (norm.includes("MINIST")) return "salut-solennel";
@@ -48,14 +88,28 @@ function mapGlossToMotion(gloss: string, index: number = 0): GestureMotionType {
   if (norm.includes("ACTE") || norm.includes("ARTICL") || norm.includes("DOCUMENT")) return "livre-ouvert";
   if (norm.includes("ACCEPT") || norm.includes("APPROUV") || norm.includes("VALIDE")) return "pouce-haut";
   if (norm.includes("DEMAND") || norm.includes("RECLAMATION")) return "demande-soumettre";
+  if (norm.includes("VENTRE") || norm.includes("BAS") || norm.includes("CONSERVATION") || norm.includes("SOUMISSION")) return "mains-bas-ventre";
+  if (norm.includes("PAUSE") || norm.includes("EXPOSE") || norm.includes("PATIENCE")) return "paumes-bas-ventre";
+  if (norm.includes("ATTENTE") || norm.includes("POSER") || norm.includes("CALME")) return "croisement-bas-ventre";
   if (norm.includes("CITOY") || norm.includes("PERSONNE")) return "main-coeur";
-  if (norm.includes("SIGNAT") || norm.includes("EPELLATION")) return "ecriture-paume";
+  if (norm.includes("SIGNAT")) return "ecriture-paume";
   if (norm.includes("HORODAT") || norm.includes("TSA") || norm.includes("DATE")) return "clock-tsa";
-  if (norm.includes("SECRET") || norm.includes("PAROLE") || norm.includes("DECRET")) return "main-bouche";
   if (norm.includes("COMPTE") || norm.includes("NOMBRE") || norm.includes("CHIFFRE")) return "comptage-doigts";
   if (norm.includes("INTERDIT") || norm.includes("BLOCAGE") || norm.includes("STOP")) return "bras-croises";
+  if (norm.includes("SURPRISE") || norm.includes("SILENCE") || norm.includes("CHOC") || norm.includes("ETONNT") || norm.includes("AHURI")) return "mains-sur-bouche";
+  if (norm.includes("SINCERE") || norm.includes("PROMESSE") || norm.includes("ENGAGE") || norm.includes("COEUR") || norm.includes("POITRINE") || norm.includes("EMOTION") || norm.includes("AFFIRM")) return "main-poitrine";
+  if (norm.includes("SIGNER") || norm.includes("APPOSER") || norm.includes("VERSO") || norm.includes("DEPOT") || norm.includes("DEPOSE")) return "doigt-verso-main";
+  if (norm.includes("ACCORD") || norm.includes("ALLIANCE") || norm.includes("UNION") || norm.includes("PACTE") || norm.includes("ENSEMBLE")) return "mains-jointes";
+  if (norm.includes("PARAGRAPHE") || norm.includes("CHAPITRE") || norm.includes("CLAUSE") || norm.includes("ALINEA") || norm.includes("DISPOSITION")) return "index-paume";
+  if (norm.includes("CONFIRME") || norm.includes("OFFICIEL") || norm.includes("DEFINITIF") || norm.includes("ARRETE") || norm.includes("TRANCHE")) return "frappe-poing-paume";
+  if (norm.includes("SOLIDARITE") || norm.includes("LIEN") || norm.includes("PARTENARIAT") || norm.includes("COOPERATION") || norm.includes("UNITE")) return "entrelacement-doigts";
 
-  // Deterministic fallback based on word content & index so EVERY single word moves the avatar!
+  // Cycle séquentiel parfait garanti sur les 20 gestes pour chaque mot
+  if (norm.includes("EPELLATION") || norm.includes("ÉPELLATION")) {
+    return MOTION_LIST[index % MOTION_LIST.length];
+  }
+
+  // Fallback déterministe ultra-varié pour chaque mot
   let charHash = 0;
   for (let i = 0; i < norm.length; i++) {
     charHash += norm.charCodeAt(i);
@@ -70,7 +124,7 @@ function mapGlossToMotion(gloss: string, index: number = 0): GestureMotionType {
 export const AiSignAvatarEngine: React.FC<AiSignAvatarEngineProps> = ({
   documentText,
   documentTitle = "Acte Administratif Officiel Signé par l'Agent",
-  signStandard = "LSM",
+  signStandard = "ASL",
   speed: initialSpeed = 1.0,
   isPlaying: initialIsPlaying = true,
   onSequenceComplete,
@@ -81,12 +135,26 @@ export const AiSignAvatarEngine: React.FC<AiSignAvatarEngineProps> = ({
   const [isPlaying, setIsPlaying] = useState(initialIsPlaying);
   const [speed, setSpeed] = useState(initialSpeed);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [pipelineStatus, setPipelineStatus] = useState("Préparation de la piste d'animation...");
 
   // Convert document text into SiGML sequence
   useEffect(() => {
     const converted = convertDocumentToSiGML(documentText || "");
     setSigmlResult(converted);
     setCurrentIdx(0);
+    const firstSign = converted.sequence[0];
+    if (firstSign) {
+      const validation = validateSiGMLSign(firstSign.sigmlSnippet);
+      const knownSigns = validateKnownSigns();
+      const knownSignsPass = Object.values(knownSigns).every((knownSign) => (
+        knownSign.frameCount > 0 && knownSign.timestampsMonotonic && knownSign.hasMotion
+      ));
+      setPipelineStatus(
+        validation.frameCount > 0 && validation.timestampsMonotonic && validation.hasMotion && knownSignsPass
+          ? `Piste valide : ${validation.frameCount} frames; BONJOUR/MERCI valides techniquement`
+          : "Piste AnimGen incomplète : vérifier le SiGML du signe"
+      );
+    }
   }, [documentText]);
 
   // Continuous Playback Loop over Document Sentences & Glosses
@@ -111,6 +179,9 @@ export const AiSignAvatarEngine: React.FC<AiSignAvatarEngineProps> = ({
 
   const sequence = sigmlResult?.sequence || [];
   const currentItem = sequence[currentIdx];
+  const totalWordCount = sigmlResult?.totalWordCount || sequence.length;
+  const translatedWordCount = sigmlResult?.translatedWordCount || sequence.length;
+  const coveragePercent = totalWordCount > 0 ? Math.round((translatedWordCount / totalWordCount) * 100) : 0;
   const activeMotion: GestureMotionType = currentItem
     ? mapGlossToMotion(currentItem.gloss, currentIdx)
     : "neutre";
@@ -129,6 +200,7 @@ export const AiSignAvatarEngine: React.FC<AiSignAvatarEngineProps> = ({
               🎬 TRADUCTION DYNAMIQUE EN LANGUE DES SIGNES (AVATAR 3D GLB DIRECT)
             </span>
           </div>
+          <span className="hidden lg:block text-[10px] font-mono text-emerald-400">{pipelineStatus}</span>
 
           <div className="flex items-center gap-2">
             <button
@@ -145,6 +217,9 @@ export const AiSignAvatarEngine: React.FC<AiSignAvatarEngineProps> = ({
           <ThreeDHumanAvatar
             motion={activeMotion}
             glossText={currentItem?.gloss}
+            sigmlXml={sigmlResult?.sigmlXml}
+            gestureIndex={currentIdx}
+            gestureDurations={sequence.map((item) => item.duration)}
             speed={speed}
             isPlaying={isPlaying}
             cameraPreset={cameraPreset}
@@ -156,6 +231,10 @@ export const AiSignAvatarEngine: React.FC<AiSignAvatarEngineProps> = ({
 
         {/* Console de Contrôle de Lecture Interactif */}
         <div className="w-full z-10 bg-slate-900/95 backdrop-blur-md border border-amber-500/50 rounded-2xl p-4 flex flex-col gap-3 shadow-2xl">
+          <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] font-mono">
+            <span className="text-emerald-400">Document couvert : {translatedWordCount}/{totalWordCount} mots ({coveragePercent}%)</span>
+            <span className="text-slate-400">Dactylologie : {sigmlResult?.dactylologyCount || 0} mots non lexicaux</span>
+          </div>
           
           {/* Barre de Progression des Signes */}
           <div className="w-full bg-slate-950 h-2 rounded-full overflow-hidden border border-slate-800 flex">

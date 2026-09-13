@@ -4,6 +4,7 @@ import { useUIStore } from '../../store/uiStore';
 import { useAuthStore } from '../../store/authStore';
 import { useDossierStore } from '../../store/dossierStore';
 import { motion } from 'framer-motion';
+import { UserProfileBanner } from '../../components/common/UserProfileBanner';
 import {
   PieChart, Pie, Cell, Tooltip as RechartsTooltip, Legend,
   BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer
@@ -169,9 +170,10 @@ export function DashboardPage() {
     <motion.div 
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="p-8 max-w-6xl mx-auto space-y-8 bg-white/60 backdrop-blur-md rounded-3xl border border-white/50 shadow-xl"
+      className="p-8 md:p-10 max-w-7xl mx-auto space-y-10 bg-white/80 backdrop-blur-md rounded-3xl border border-slate-200/80 shadow-xl"
       dir={lang === "AR" ? "rtl" : "ltr"}
     >
+      <UserProfileBanner />
       {/* BANNIÈRE DE NOTIFICATION POUR LE CITOYEN À L'ENTRÉE DE SON ESPACE */}
       {pendingNotificationDossier && (
         <motion.div

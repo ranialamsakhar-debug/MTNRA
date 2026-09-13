@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useSearchParams } from "react-router-dom";
+import { UserProfileBanner } from "../../components/common/UserProfileBanner";
 
 interface UserAdmin {
   id: number;
@@ -10,6 +11,8 @@ interface UserAdmin {
   role: string;
   habilitation: string;
   actif: boolean;
+  joursDisponibles?: number[];
+  dossiersEnCours?: number;
 }
 
 const INITIAL_USERS: UserAdmin[] = [
@@ -17,7 +20,7 @@ const INITIAL_USERS: UserAdmin[] = [
   { id: 2002, nom: "EL IDRISSI", prenom: "Karim", email: "karim.elidrissi@tawsa.ma", role: "AGENT_VALIDATION", habilitation: "NIVEAU_2", actif: true },
   { id: 2003, nom: "ZAHRA", prenom: "Fatima", email: "fatima.zahra@tawsa.ma", role: "AGENT_CERTIFICATION", habilitation: "NIVEAU_2", actif: true },
   { id: 2004, nom: "MANSOURI", prenom: "Samira", email: "samira.mansouri@tawsa.ma", role: "AGENT_SIGNATURE", habilitation: "NIVEAU_2", actif: true },
-  { id: 2005, nom: "TAZI", prenom: "Youssef", email: "youssef.tazi@tawsa.ma", role: "MEDIATEUR", habilitation: "NIVEAU_3", actif: true }
+  { id: 2005, nom: "TAZI", prenom: "Youssef", email: "youssef.tazi@tawsa.ma", role: "MEDIATEUR", habilitation: "NIVEAU_3", actif: true, joursDisponibles: [1, 2, 3, 4, 5], dossiersEnCours: 2 }
 ];
 
 export function AdminPage() {
@@ -37,6 +40,8 @@ export function AdminPage() {
   };
   const [users, setUsers] = useState<UserAdmin[]>(INITIAL_USERS);
   const [newUser, setNewUser] = useState({ nom: "", prenom: "", email: "", role: "AGENT_RECLAMATION" });
+  const [dateAffectation, setDateAffectation] = useState("");
+  const [propositionsBackend, setPropositionsBackend] = useState<UserAdmin[] | null>(null);
   const [inlineFeedback, setInlineFeedback] = useState<Record<string, string>>({});
 
   const showInlineFeedback = (buttonKey: string, msg: string) => {
@@ -61,12 +66,42 @@ export function AdminPage() {
       email: newUser.email,
       role: newUser.role,
       habilitation: "NIVEAU_2",
-      actif: true
+      actif: true,
+      joursDisponibles: newUser.role === "MEDIATEUR" ? [1, 2, 3, 4, 5] : undefined,
+      dossiersEnCours: newUser.role === "MEDIATEUR" ? 0 : undefined
     };
     setUsers([...users, created]);
     showInlineFeedback("addUser", `✅ Utilisateur ${created.prenom} ${created.nom} créé avec succès !`);
     setNewUser({ nom: "", prenom: "", email: "", role: "AGENT_RECLAMATION" });
+    setDateAffectation("");
   };
+
+  const jourSelectionne = dateAffectation ? new Date(`${dateAffectation}T00:00:00`).getDay() : null;
+  const propositionsMediateurs = jourSelectionne === null
+    ? []
+    : users
+        .filter((u) => u.role === "MEDIATEUR" && u.actif)
+        .filter((u) => (u.joursDisponibles || [1, 2, 3, 4, 5]).includes(jourSelectionne))
+        .sort((a, b) => (a.dossiersEnCours || 0) - (b.dossiersEnCours || 0));
+
+  useEffect(() => {
+    if (!dateAffectation) {
+      setPropositionsBackend(null);
+      return;
+    }
+
+    const controller = new AbortController();
+    fetch(`http://localhost:8081/api/responsable-service/mediateurs/propositions?date=${dateAffectation}`, {
+      signal: controller.signal
+    })
+      .then((response) => response.ok ? response.json() : Promise.reject(new Error("API indisponible")))
+      .then((data: UserAdmin[]) => setPropositionsBackend(data))
+      .catch(() => setPropositionsBackend(null));
+
+    return () => controller.abort();
+  }, [dateAffectation]);
+
+  const propositions = propositionsBackend ?? propositionsMediateurs;
 
   const toggleUserStatus = (id: number) => {
     setUsers(users.map(u => u.id === id ? { ...u, actif: !u.actif } : u));
@@ -80,6 +115,7 @@ export function AdminPage() {
 
   return (
     <div className="p-8 max-w-7xl mx-auto space-y-8 font-sans">
+      <UserProfileBanner />
       {/* Header Admin */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-900 text-white p-6 rounded-3xl shadow-xl">
         <div className="flex items-center gap-3">
@@ -204,6 +240,33 @@ export function AdminPage() {
                   <option value="ADMINISTRATEUR">Administrateur</option>
                 </select>
               </div>
+              {newUser.role === "MEDIATEUR" && (
+                <div className="space-y-2 p-3 bg-teal-50 border border-teal-200 rounded-xl">
+                  <label className="block text-[11px] font-bold text-teal-900 uppercase mb-1">Date souhaitée de disponibilité</label>
+                  <input
+                    type="date"
+                    required
+                    value={dateAffectation}
+                    onChange={(e) => setDateAffectation(e.target.value)}
+                    className="w-full p-2.5 bg-white border border-teal-200 rounded-xl text-xs font-bold"
+                  />
+                  {dateAffectation && (
+                    <div className="space-y-1.5">
+                      <p className="text-[11px] font-black text-teal-900">Propositions disponibles pour cette date</p>
+                      {propositions.length === 0 ? (
+                        <p className="text-[11px] font-semibold text-rose-700">Aucun médiateur disponible. Choisissez une autre date.</p>
+                      ) : (
+                        propositions.map((mediateur, index) => (
+                          <div key={mediateur.id} className="flex items-center justify-between bg-white border border-teal-100 rounded-lg px-2.5 py-2 text-[11px]">
+                            <span className="font-bold text-slate-900">{index === 0 ? "★ " : ""}{mediateur.prenom} {mediateur.nom}</span>
+                            <span className="text-slate-500">{mediateur.dossiersEnCours || 0} dossier(s) en cours</span>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
               <div className="space-y-2">
                 <button type="submit" className="w-full py-3 bg-slate-900 text-white font-black text-xs rounded-xl shadow cursor-pointer">
                   + Ajouter l'Utilisateur

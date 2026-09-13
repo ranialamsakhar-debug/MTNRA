@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useSearchParams } from "react-router-dom";
+import { UserProfileBanner } from "../../components/common/UserProfileBanner";
 
 interface CertDoc {
   id: string;
@@ -124,6 +125,7 @@ export function AgentCertificationPage() {
 
   return (
     <div className="p-8 max-w-7xl mx-auto space-y-8 font-sans">
+      <UserProfileBanner />
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white/80 backdrop-blur-md p-6 rounded-3xl border border-slate-200 shadow-sm">
         <div className="flex items-center gap-3">
           <span className="p-3 bg-slate-100 text-slate-800 rounded-2xl text-2xl font-black">

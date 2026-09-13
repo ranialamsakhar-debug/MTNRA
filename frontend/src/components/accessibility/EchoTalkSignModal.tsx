@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import * as pdfjsLib from "pdfjs-dist";
 import { AiSignAvatarEngine } from "./AiSignAvatarEngine";
 import { convertDocumentToSiGML, fetchSiGMLFromLsmApi, SiGMLConversionResult, SiGMLItem } from "../../services/sigmlConverter";
 
@@ -16,12 +17,32 @@ interface EchoTalkSignModalProps {
   documentData?: DocumentData | null;
 }
 
+pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
+  "pdfjs-dist/build/pdf.worker.min.mjs",
+  import.meta.url
+).toString();
+
+async function extractDocumentText(file: File): Promise<string> {
+  if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) {
+    return file.text();
+  }
+
+  const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(await file.arrayBuffer()) }).promise;
+  const pages: string[] = [];
+  for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
+    const page = await pdf.getPage(pageNumber);
+    const content = await page.getTextContent();
+    pages.push(content.items.map((item) => ("str" in item ? item.str : "")).join(" "));
+  }
+  return pages.join("\n").trim();
+}
+
 export function EchoTalkSignModal({
   isOpen,
   onClose,
   documentData,
 }: EchoTalkSignModalProps) {
-  const [signStandard, setSignStandard] = useState<"LSM" | "LSF" | "ASL" | "UNIVERSEL">("LSM");
+  const [signStandard, setSignStandard] = useState<"LSM" | "LSF" | "ASL" | "UNIVERSEL">("ASL");
   const [playbackSpeed, setPlaybackSpeed] = useState<number>(1.0);
   const [isPlaying, setIsPlaying] = useState<boolean>(true);
 
@@ -64,28 +85,24 @@ ARTICLE 2 — DROITS ET EFFETS JURIDIQUES: Le présent acte vaut autorisation l�
   }, [isOpen, documentData, signStandard]);
 
   // Gestion du téléversement de document PDF/TXT par le citoyen ou l'agent
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     setIsUploading(true);
     setUploadedFileName(file.name);
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const content = (event.target?.result as string) || "";
+    try {
+      const content = await extractDocumentText(file);
       const textToUse = content.trim() || `Document : ${file.name}. Décision administrative officielle. Demande acceptée et validée.`;
-      processDocumentText(textToUse, `Document : ${file.name}`);
-      setIsUploading(false);
-    };
-
-    reader.onerror = () => {
+      await processDocumentText(textToUse, `Document : ${file.name}`);
+    } catch (error) {
+      console.error("Document extraction failed:", error);
       const textFallback = `Document ${file.name}. Décision administrative officielle. Demande acceptée et validée.`;
-      processDocumentText(textFallback, `Document : ${file.name}`);
+      await processDocumentText(textFallback, `Document : ${file.name}`);
+    } finally {
       setIsUploading(false);
-    };
-
-    reader.readAsText(file);
+    }
   };
 
   if (!isOpen) return null;
@@ -192,6 +209,9 @@ ARTICLE 2 — DROITS ET EFFETS JURIDIQUES: Le présent acte vaut autorisation l�
               </div>
               <p className="text-xs text-slate-300 leading-relaxed font-sans bg-slate-900/60 p-3 rounded-xl border border-slate-800/80">
                 {documentContent || defaultDocument.content}
+              </p>
+              <p className="text-xs text-amber-300 leading-relaxed bg-amber-500/5 p-3 rounded-xl border border-amber-500/20">
+                Résumé utilisé pour le contrôle : {sigmlData?.summaryText || "Résumé en préparation..."}
               </p>
             </div>
 

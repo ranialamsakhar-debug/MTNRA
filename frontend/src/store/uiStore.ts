@@ -4,7 +4,7 @@ interface UIState {
   lang: string;
   setLang: (lang: string) => void;
   isChatOpen: boolean;
-  toggleChat: () => void;
+  toggleChat: (open?: boolean) => void;
 }
 
 export const useUIStore = create<UIState>((set) => ({
@@ -14,5 +14,5 @@ export const useUIStore = create<UIState>((set) => ({
     set({ lang });
   },
   isChatOpen: false,
-  toggleChat: () => set((state) => ({ isChatOpen: !state.isChatOpen })),
+  toggleChat: (open) => set((state) => ({ isChatOpen: open !== undefined ? open : !state.isChatOpen })),
 }));

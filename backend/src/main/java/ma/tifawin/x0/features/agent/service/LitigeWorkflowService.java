@@ -66,6 +66,13 @@ public class LitigeWorkflowService {
         enregistrerHistorique(dossier, citoyen, TypeAction.SAISINE_MEDIATEUR,
                 "Le citoyen a saisi le médiateur. Motif : " + motif);
 
+        String informationsDemande = "Nouvelle saisine médiateur pour le dossier " + dossier.getNumeroDossier()
+                + ". Citoyen : " + citoyen.getNom() + " " + citoyen.getPrenom()
+                + ". Motif : " + motif + ". Description : "
+                + (description != null ? description : "Non fournie");
+        responsableServiceRepository.findAll().forEach(responsable ->
+                creerNotification(responsable, dossier, informationsDemande));
+
         return litigeRepository.save(litige);
     }
 
@@ -87,6 +94,10 @@ public class LitigeWorkflowService {
         enregistrerHistorique(litige.getDossier(), mediateur, TypeAction.SAISINE_MEDIATEUR,
                 "Le médiateur " + mediateur.getNom() + " " + mediateur.getPrenom()
                         + " prend en charge l'instruction du litige " + litige.getNumeroLitige());
+
+        creerNotification(mediateur, litige.getDossier(),
+                "Informations transmises par le responsable concernant le dossier "
+                        + litige.getDossier().getNumeroDossier() + " : " + litige.getDescription());
 
         // Notifier le citoyen que son litige est pris en charge
         creerNotification(litige.getCitoyen(), litige.getDossier(),

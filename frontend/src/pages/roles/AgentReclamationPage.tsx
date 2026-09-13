@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { Link, useSearchParams } from "react-router-dom";
 import { useDossierStore, DocumentItem, DossierItem } from "../../store/dossierStore";
 import { HistoriqueGlobalDemandesModal } from "../../components/common/HistoriqueGlobalDemandesModal";
+import { UserProfileBanner } from "../../components/common/UserProfileBanner";
 
 export function AgentReclamationPage() {
   const { dossiers: storeDossiers, requestAdditionalDocuments, updateDossierDecision } = useDossierStore();
@@ -77,7 +78,8 @@ export function AgentReclamationPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="max-w-7xl mx-auto space-y-8 py-6 px-4 sm:px-6 lg:px-8">
+      <UserProfileBanner />
       {/* Banner Titre & Role Agent */}
       <motion.div
         initial={{ opacity: 0, y: -10 }}

@@ -222,6 +222,110 @@ async def process_chat_query(payload: ChatQuery):
     )
 
 
+# ── Modèle & Endpoint d'Optimisation de Texte IA ──
+
+class OptimizeQuery(BaseModel):
+    text: str
+
+
+class OptimizeResponse(BaseModel):
+    optimizedText: str
+    summaryPoints: List[str]
+    objetPropose: str
+
+
+def fallback_text_optimizer(text: str) -> dict:
+    cleaned = text.strip()
+    sentences = [s.strip() for s in cleaned.replace('\n', '. ').split('.') if len(s.strip()) > 3]
+    
+    filtered_sentences = []
+    for s in sentences:
+        low = s.lower()
+        if not any(w in low for w in ["bonjour", "salut", "s'il vous plait", "s'il vous plaît", "merci d'avance", "cordialement"]):
+            filtered_sentences.append(s)
+
+    if not filtered_sentences:
+        filtered_sentences = sentences
+
+    summary_points = []
+    for idx, sentence in enumerate(filtered_sentences[:4], 1):
+        summary_points.append(f"Point {idx} : {sentence}")
+
+    objet = "Demande d'intervention et suivi de dossier administratif"
+    if "passeport" in text.lower():
+        objet = "Demande relative à la délivrance du passeport"
+    elif "cni" in text.lower() or "cnie" in text.lower():
+        objet = "Demande relative à la Carte Nationale d'Identité"
+    elif "acte" in text.lower() or "naissance" in text.lower():
+        objet = "Demande de délivrance d'acte d'état civil"
+    elif "certificat" in text.lower():
+        objet = "Demande de certificat administratif officiel"
+
+    synthesis = f"📋 SYNTHÈSE ADMINISTRATIVE OPTIMISÉE :\n\n"
+    synthesis += f"• Objet : {objet}\n"
+    synthesis += f"• Contenu synthétisé : { ' '.join(filtered_sentences) }\n\n"
+    synthesis += "• Points clés identifiés :\n"
+    for pt in summary_points:
+        synthesis += f"  - {pt}\n"
+
+    return {
+        "optimizedText": synthesis,
+        "summaryPoints": summary_points,
+        "objetPropose": objet
+    }
+
+
+@app.post("/api/chatbot/optimize-text", response_model=OptimizeResponse)
+@app.post("/optimize-text", response_model=OptimizeResponse)
+async def optimize_text(payload: OptimizeQuery):
+    text = payload.text.strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="Le texte ne peut pas être vide.")
+
+    if GROQ_API_KEY:
+        try:
+            prompt = (
+                "Tu es un expert en rédaction administrative officielle pour les citoyens au Maroc.\n"
+                "Ta mission est d'OPTIMISER et SYNTHÉTISER le texte de la réclamation d'un citoyen.\n"
+                "1. Réduis la longueur tout en gardant l'intégralité des faits et demandes importants.\n"
+                "2. Rédige de manière professionnelle, claire et concise.\n"
+                "3. Extrais les points clés sous forme de puces simples.\n\n"
+                f"Texte du citoyen :\n{text}\n\n"
+                "Réponds au format JSON strict comme suit :\n"
+                "{\n"
+                '  "objetPropose": "<Sujet court de la demande>",\n'
+                '  "optimizedText": "<Texte administratif synthétisé et structuré>",\n'
+                '  "summaryPoints": ["<Point clé 1>", "<Point clé 2>", "<Point clé 3>"]\n'
+                "}"
+            )
+            raw_res = appeler_groq(prompt)
+            # Tenter de parser le JSON dans la réponse Groq
+            try:
+                # Extraire le bloc JSON s'il y a du markdown autour
+                clean_json = raw_res
+                if "```json" in raw_res:
+                    clean_json = raw_res.split("```json")[1].split("```")[0].strip()
+                elif "```" in raw_res:
+                    clean_json = raw_res.split("```")[1].split("```")[0].strip()
+                
+                parsed = json.loads(clean_json)
+                return OptimizeResponse(
+                    optimizedText=parsed.get("optimizedText", raw_res),
+                    summaryPoints=parsed.get("summaryPoints", []),
+                    objetPropose=parsed.get("objetPropose", "Demande administrative")
+                )
+            except Exception:
+                # Si le JSON n'est pas strict, utiliser le texte brut
+                fallback = fallback_text_optimizer(text)
+                fallback["optimizedText"] = raw_res
+                return OptimizeResponse(**fallback)
+        except Exception as e:
+            logger.warning(f"Groq optimize error: {e}")
+
+    fb = fallback_text_optimizer(text)
+    return OptimizeResponse(**fb)
+
+
 # ── Web Scraping des Actualités ──────────────────
 
 def scrape_maroc_news():

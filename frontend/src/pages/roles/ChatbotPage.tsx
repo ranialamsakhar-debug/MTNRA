@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useUIStore } from "../../store/uiStore";
+import { UserProfileBanner } from "../../components/common/UserProfileBanner";
 
 interface Message {
   id: string;
@@ -340,10 +341,10 @@ export function ChatbotPage({ currentRole = "CITOYEN" }: ChatbotWidgetProps) {
   );
 
   return (
-    <>
+    <div className="w-full max-w-6xl mx-auto font-sans space-y-4">
       <audio ref={audioElementRef} className="hidden" />
-
-      <div className="w-full max-w-6xl mx-auto flex gap-4 h-[calc(100vh-4rem)] font-sans">
+      <UserProfileBanner />
+      <div className="flex gap-4 h-[calc(100vh-10rem)]">
         {/* Volet Historique des conversations & recherches (collapsible / responsive) */}
         <AnimatePresence>
           {(showHistory || window.innerWidth >= 1024) && (
@@ -605,6 +606,6 @@ export function ChatbotPage({ currentRole = "CITOYEN" }: ChatbotWidgetProps) {
           </form>
         </motion.div>
       </div>
-    </>
+    </div>
   );
 }

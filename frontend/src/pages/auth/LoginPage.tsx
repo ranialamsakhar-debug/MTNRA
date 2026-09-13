@@ -251,23 +251,23 @@ export function LoginPage() {
       className="min-h-screen flex flex-col items-center justify-center p-4 relative"
       dir={lang === "AR" ? "rtl" : "ltr"}
     >
-      <div className="w-full max-w-md bg-white/10 backdrop-blur-xl p-8 rounded-[2.5rem] shadow-[0_30px_60px_-15px_rgba(0,0,0,0.5)] border border-white/20 relative z-10">
+      <div className="w-full max-w-md bg-white/20 backdrop-blur-md p-8 rounded-[2.5rem] shadow-xl border-2 border-white/70 relative z-10 text-slate-900">
         <div className="text-center mb-8">
-          <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-primary to-cyan-500 text-white flex items-center justify-center font-black text-4xl mx-auto mb-4 shadow-[0_0_30px_rgba(37,99,235,0.4)]">
+          <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-primary to-cyan-500 text-white flex items-center justify-center font-black text-4xl mx-auto mb-4 shadow-lg">
             T
           </div>
-          <h2 className="text-3xl font-black text-white tracking-tight">{t.title}</h2>
-          <p className="text-white/70 text-xs mt-1">{t.subtitle}</p>
+          <h2 className="text-3xl font-black text-slate-900 tracking-tight">{t.title}</h2>
+          <p className="text-slate-700 text-xs font-bold mt-1">{t.subtitle}</p>
         </div>
 
         {error && (
-          <div className="mb-6 p-3 bg-red-500/20 border border-red-500/50 rounded-xl text-red-100 text-xs font-semibold text-center">
+          <div className="mb-6 p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-red-700 text-xs font-bold text-center">
             {error}
           </div>
         )}
 
         {otpSentMessage && step === "otp" && (
-          <div className="mb-6 p-3 bg-emerald-500/20 border border-emerald-500/50 rounded-xl text-emerald-100 text-xs font-semibold text-center">
+          <div className="mb-6 p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-emerald-800 text-xs font-bold text-center">
             {otpSentMessage}
           </div>
         )}
@@ -283,13 +283,13 @@ export function LoginPage() {
               className="space-y-4"
             >
               <div>
-                <label className="block text-xs font-semibold text-white/90 uppercase tracking-wider mb-1 drop-shadow-sm">
+                <label className="block text-xs font-black text-slate-800 uppercase tracking-wider mb-1">
                   {t.roleLabel}
                 </label>
                 <select
                   value={role}
                   onChange={(e) => handleRoleChange(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-white/30 bg-slate-900 text-white text-xs focus:ring-2 focus:ring-white/50 outline-none transition font-bold"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300/80 bg-white/80 text-slate-900 text-xs focus:ring-2 focus:ring-slate-900/30 outline-none transition font-black cursor-pointer shadow-xs"
                 >
                   <option value="CITOYEN">{t.citizen}</option>
                   <option value="AGENT_RECLAMATION">{t.agentRec}</option>
@@ -303,7 +303,7 @@ export function LoginPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-white/90 uppercase tracking-wider mb-1 drop-shadow-sm">
+                <label className="block text-xs font-black text-slate-800 uppercase tracking-wider mb-1">
                   {t.emailLabel}
                 </label>
                 <input
@@ -312,12 +312,12 @@ export function LoginPage() {
                   value={userEmail}
                   onChange={(e) => setUserEmail(e.target.value)}
                   placeholder={t.emailPlaceholder}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-white/30 bg-white/15 text-white placeholder:text-white/50 text-xs focus:ring-2 focus:ring-white/50 outline-none transition font-medium"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300/80 bg-white/70 text-slate-900 placeholder:text-slate-500 text-xs focus:ring-2 focus:ring-slate-900/30 outline-none transition font-bold shadow-xs"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-white/90 uppercase tracking-wider mb-1 drop-shadow-sm">
+                <label className="block text-xs font-black text-slate-800 uppercase tracking-wider mb-1">
                   {t.cniLabel}
                 </label>
                 <input
@@ -326,12 +326,12 @@ export function LoginPage() {
                   value={cni}
                   onChange={(e) => setCni(e.target.value)}
                   placeholder={t.cniPlaceholder}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-white/30 bg-white/15 text-white placeholder:text-white/50 text-xs focus:ring-2 focus:ring-white/50 outline-none transition font-medium"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300/80 bg-white/70 text-slate-900 placeholder:text-slate-500 text-xs focus:ring-2 focus:ring-slate-900/30 outline-none transition font-bold shadow-xs"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-white/90 uppercase tracking-wider mb-1 drop-shadow-sm">
+                <label className="block text-xs font-black text-slate-800 uppercase tracking-wider mb-1">
                   N° Téléphone Mobile (Réception SMS Twilio)
                 </label>
                 <input
@@ -340,16 +340,16 @@ export function LoginPage() {
                   value={userPhone}
                   onChange={(e) => setUserPhone(e.target.value)}
                   placeholder="Ex: 0639475920 ou +212639475920"
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-white/30 bg-white/15 text-white placeholder:text-white/50 text-xs focus:ring-2 focus:ring-white/50 outline-none transition font-mono font-semibold"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300/80 bg-white/70 text-slate-900 placeholder:text-slate-500 text-xs focus:ring-2 focus:ring-slate-900/30 outline-none transition font-mono font-bold shadow-xs"
                 />
               </div>
 
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full mt-4 bg-white hover:bg-slate-50 text-slate-900 font-black py-3 rounded-xl shadow-[0_0_20px_rgba(255,255,255,0.3)] transition-all flex items-center justify-center gap-2 disabled:opacity-50 text-sm tracking-wide cursor-pointer"
+                className="w-full mt-4 bg-slate-900 hover:bg-slate-800 text-white font-black py-3 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50 text-sm tracking-wide cursor-pointer"
               >
-                {loading ? <span className="inline-block animate-spin rounded-full h-4 w-4 border-2 border-slate-900 border-t-transparent" /> : null}
+                {loading ? <span className="inline-block animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" /> : null}
                 <span>{loading ? t.btnSending : t.btnOtp}</span>
               </button>
             </motion.form>

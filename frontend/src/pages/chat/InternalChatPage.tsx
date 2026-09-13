@@ -39,7 +39,6 @@ const DEFAULT_CHANNELS: CanalItem[] = [
     description: "Canal direct d'échanges entre citoyens, guichet unifié et agents référents.",
     type: "GROUPE_DEPARTEMENT",
     departement: "RECLAMATION",
-    unreadCount: 1,
   },
   {
     idCanal: 1,
@@ -47,7 +46,6 @@ const DEFAULT_CHANNELS: CanalItem[] = [
     description: "Canal officiel pour l'instruction et la qualification des dossiers citoyens.",
     type: "GROUPE_DEPARTEMENT",
     departement: "RECLAMATION",
-    unreadCount: 2,
   },
   {
     idCanal: 2,
@@ -98,19 +96,9 @@ export function InternalChatPage() {
   const { user } = useAuthStore();
   const [canaux, setCanaux] = useState<CanalItem[]>(DEFAULT_CHANNELS);
   const [activeCanal, setActiveCanal] = useState<CanalItem>(DEFAULT_CHANNELS[0]);
-  
+
+  // Vrais messages entre acteurs — pas de messages système automatiques
   const defaultMessages: MessageItem[] = [
-    {
-      idMessage: 1,
-      canalId: 7,
-      expediteurId: 101,
-      expediteurNom: "BENALI",
-      expediteurPrenom: "Ahmed",
-      expediteurService: "Service Réclamation",
-      contenu: "Bonjour Mlle Rania Lamsakhar. Votre dossier DOS-2026-89421 est bien en cours d'instruction. N'hésitez pas à déposer les pièces urgentes directement ici ou dans votre espace 'Gestion des Dossiers'.",
-      dateEnvoi: new Date(Date.now() - 3600000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-      lu: true,
-    },
     {
       idMessage: 2,
       canalId: 1,
@@ -118,9 +106,9 @@ export function InternalChatPage() {
       expediteurNom: "BENALI",
       expediteurPrenom: "Ahmed",
       expediteurService: "Réclamations",
-      contenu: "Bonjour l'équipe, le dossier DOS-2026-89421 nécessite une vérification urgente du registre de commerce.",
+      contenu: "Le dossier DOS-2026-89421 nécessite une vérification urgente du registre de commerce.",
       dateEnvoi: new Date(Date.now() - 3600000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-      lu: true,
+      lu: false,
     },
     {
       idMessage: 3,
@@ -129,20 +117,16 @@ export function InternalChatPage() {
       expediteurNom: "EL IDRISSI",
       expediteurPrenom: "Karim",
       expediteurService: "Validation",
-      contenu: "Reçu Ahmed. Nous validons la conformité de l'acte de propriété aujourd'hui.",
-      dateEnvoi: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-      lu: true,
+      contenu: "Reçu. Nous validons la conformité de l'acte de propriété aujourd'hui.",
+      dateEnvoi: new Date(Date.now() - 1800000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      lu: false,
     },
   ];
 
   const loadInitialMessages = (): MessageItem[] => {
-    const saved = localStorage.getItem("tawsa_chat_messages");
+    const saved = localStorage.getItem("tawsa_chat_messages_v2");
     if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (e) {
-        return defaultMessages;
-      }
+      try { return JSON.parse(saved); } catch { return defaultMessages; }
     }
     return defaultMessages;
   };
@@ -159,21 +143,26 @@ export function InternalChatPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
-  useEffect(() => {
-    scrollToBottom();
-    localStorage.setItem("tawsa_chat_messages", JSON.stringify(messages));
-  }, [messages]);
+  // Calculer dynamiquement le nombre de messages non lus par canal
+  const getUnreadCount = (canalId: number) =>
+    messages.filter((m) => m.canalId === canalId && !m.lu && m.expediteurId !== 999).length;
+
+  // Marquer comme lus tous les messages du canal actif
+  const markCanalAsRead = (canalId: number) => {
+    setMessages((prev) =>
+      prev.map((m) => m.canalId === canalId ? { ...m, lu: true } : m)
+    );
+  };
 
   useEffect(() => {
-    if (activeCanal.unreadCount && activeCanal.unreadCount > 0) {
-      setCanaux((prev) =>
-        prev.map((c) =>
-          c.idCanal === activeCanal.idCanal ? { ...c, unreadCount: 0 } : c
-        )
-      );
-      setActiveCanal((prev) => ({ ...prev, unreadCount: 0 }));
-    }
-  }, [activeCanal]);
+    scrollToBottom();
+    localStorage.setItem("tawsa_chat_messages_v2", JSON.stringify(messages));
+  }, [messages]);
+
+  // Marquer comme lus quand on change de canal
+  useEffect(() => {
+    markCanalAsRead(activeCanal.idCanal);
+  }, [activeCanal.idCanal]);
 
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
@@ -194,22 +183,7 @@ export function InternalChatPage() {
     setMessages((prev) => [...prev, newMsg]);
     setInputValue("");
 
-    if (user?.role === "CITOYEN") {
-      setTimeout(() => {
-        const agentReply: MessageItem = {
-          idMessage: Date.now() + 1,
-          canalId: activeCanal.idCanal,
-          expediteurId: 101,
-          expediteurNom: "BENALI",
-          expediteurPrenom: "Ahmed",
-          expediteurService: "Service Réclamations",
-          contenu: `Bonjour ${user.prenom}, votre message a bien été répertorié au niveau du guichet. L'agent instructeur traite votre dossier et les notifications sont aussi visibles dans votre espace 'Gestion des Dossiers'.`,
-          dateEnvoi: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-          lu: true,
-        };
-        setMessages((prev) => [...prev, agentReply]);
-      }, 1200);
-    }
+    // ── Pas de réponse automatique système ── (comme WhatsApp : seuls les acteurs écrivent)
 
     fetch("http://localhost:8081/api/features/chat/messages", {
       method: "POST",
@@ -227,7 +201,11 @@ export function InternalChatPage() {
     const existing = canaux.find((c) => c.idCanal === chatPriveId);
 
     if (existing) {
-      setActiveCanal(existing);
+      // Marquer comme lu en ouvrant
+      setCanaux((prev) =>
+        prev.map((c) => c.idCanal === chatPriveId ? { ...c, unreadCount: 0 } : c)
+      );
+      setActiveCanal({ ...existing, unreadCount: 0 });
     } else {
       const newPrivateCanal: CanalItem = {
         idCanal: chatPriveId,
@@ -237,19 +215,8 @@ export function InternalChatPage() {
       };
       setCanaux((prev) => [...prev, newPrivateCanal]);
       setActiveCanal(newPrivateCanal);
-      setMessages([
-        {
-          idMessage: Date.now(),
-          canalId: chatPriveId,
-          expediteurId: agent.id,
-          expediteurNom: agent.nom,
-          expediteurPrenom: agent.prenom,
-          expediteurService: agent.serviceAffectation,
-          contenu: `Bonjour ! Vous êtes en communication privée directe avec ${agent.prenom} ${agent.nom}.`,
-          dateEnvoi: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-          lu: true,
-        },
-      ]);
+      // ── Pas de message de bienvenue système ── (comme WhatsApp : conversation vide au départ)
+      setMessages((prev) => prev.filter((m) => m.canalId !== chatPriveId));
     }
   };
 
@@ -325,11 +292,14 @@ export function InternalChatPage() {
                       }`}
                     >
                       <span className="truncate">{canal.nom}</span>
-                      {canal.unreadCount && canal.unreadCount > 0 ? (
-                        <span className="px-1.5 py-0.5 rounded-full bg-red-500 text-white text-[10px] font-black">
-                          {canal.unreadCount}
-                        </span>
-                      ) : null}
+                      {(() => {
+                        const unread = getUnreadCount(canal.idCanal);
+                        return unread > 0 ? (
+                          <span className="px-1.5 py-0.5 rounded-full bg-red-500 text-white text-[10px] font-black min-w-[18px] text-center animate-pulse">
+                            {unread}
+                          </span>
+                        ) : null;
+                      })()}
                     </button>
                   );
                 })}
@@ -342,23 +312,33 @@ export function InternalChatPage() {
               Chat Privé (Employés)
             </span>
             <div className="space-y-1">
-              {colleagues.map((agent) => (
-                <button
-                  key={agent.id}
-                  onClick={() => startPrivateChat(agent)}
-                  className="w-full text-left p-2.5 rounded-2xl text-xs hover:bg-white/10 text-slate-300 hover:text-white transition flex items-center justify-between cursor-pointer"
-                >
-                  <div className="flex items-center gap-2 truncate">
-                    <span className="w-2 h-2 rounded-full bg-emerald-400" />
-                    <span className="truncate font-medium">
-                      {agent.prenom} {agent.nom}
-                    </span>
-                  </div>
-                  <span className="text-[9px] text-slate-400 px-1.5 py-0.5 rounded bg-white/5 truncate max-w-[90px]">
-                    {agent.serviceAffectation.replace("Service ", "")}
-                  </span>
-                </button>
-              ))}
+              {colleagues.map((agent) => {
+                const privateUnread = getUnreadCount(1000 + agent.id);
+                return (
+                  <button
+                    key={agent.id}
+                    onClick={() => startPrivateChat(agent)}
+                    className="w-full text-left p-2.5 rounded-2xl text-xs hover:bg-white/10 text-slate-300 hover:text-white transition flex items-center justify-between cursor-pointer"
+                  >
+                    <div className="flex items-center gap-2 truncate">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                      <span className="truncate font-medium">
+                        {agent.prenom} {agent.nom}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {privateUnread > 0 && (
+                        <span className="px-1.5 py-0.5 rounded-full bg-red-500 text-white text-[10px] font-black min-w-[18px] text-center animate-pulse">
+                          {privateUnread}
+                        </span>
+                      )}
+                      <span className="text-[9px] text-slate-400 px-1.5 py-0.5 rounded bg-white/5 truncate max-w-[80px]">
+                        {agent.serviceAffectation.replace("Service ", "")}
+                      </span>
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           </div>
         </div>
@@ -429,40 +409,50 @@ export function InternalChatPage() {
 
         {/* Fil des messages */}
         <div className="flex-1 p-6 overflow-y-auto space-y-4">
-          {messages.map((msg) => {
-            const isMe = msg.expediteurId === 999;
-            return (
-              <motion.div
-                key={msg.idMessage}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className={`flex flex-col ${isMe ? "items-end" : "items-start"}`}
-              >
-                {!isMe && (
-                  <div className="flex items-center gap-2 mb-1 px-1 text-[11px] text-slate-400">
-                    <span className="font-bold text-slate-200">
-                      {msg.expediteurPrenom} {msg.expediteurNom}
-                    </span>
-                    <span className="px-1.5 py-0.2 rounded bg-white/10 text-[9px] text-amber-300">
-                      {msg.expediteurService}
-                    </span>
-                  </div>
-                )}
+          {messages.filter((m) => m.canalId === activeCanal.idCanal).length === 0 ? (
+            <div className="h-full flex flex-col items-center justify-center gap-3 text-slate-400 select-none">
+              <span className="text-5xl opacity-30">💬</span>
+              <p className="text-sm font-semibold">Aucun message pour l'instant</p>
+              <p className="text-xs text-slate-500">Soyez le premier à écrire dans ce canal.</p>
+            </div>
+          ) : (
+            messages
+              .filter((m) => m.canalId === activeCanal.idCanal)
+              .map((msg) => {
+                const isMe = msg.expediteurId === 999;
+                return (
+                  <motion.div
+                    key={msg.idMessage}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className={`flex flex-col ${isMe ? "items-end" : "items-start"}`}
+                  >
+                    {!isMe && (
+                      <div className="flex items-center gap-2 mb-1 px-1 text-[11px] text-slate-400">
+                        <span className="font-bold text-slate-200">
+                          {msg.expediteurPrenom} {msg.expediteurNom}
+                        </span>
+                        <span className="px-1.5 py-0.2 rounded bg-white/10 text-[9px] text-amber-300">
+                          {msg.expediteurService}
+                        </span>
+                      </div>
+                    )}
 
-                <div
-                  className={`max-w-[75%] p-4 rounded-3xl text-xs shadow-lg leading-relaxed ${
-                    isMe
-                      ? "bg-primary text-white rounded-br-none"
-                      : "bg-white/10 border border-white/15 text-slate-100 rounded-bl-none"
-                  }`}
-                >
-                  <p className="whitespace-pre-line">{msg.contenu}</p>
-                </div>
+                    <div
+                      className={`max-w-[75%] p-4 rounded-3xl text-xs shadow-lg leading-relaxed ${
+                        isMe
+                          ? "bg-primary text-white rounded-br-none"
+                          : "bg-white/10 border border-white/15 text-slate-100 rounded-bl-none"
+                      }`}
+                    >
+                      <p className="whitespace-pre-line">{msg.contenu}</p>
+                    </div>
 
-                <span className="text-[10px] text-slate-400 mt-1 px-2">{msg.dateEnvoi}</span>
-              </motion.div>
-            );
-          })}
+                    <span className="text-[10px] text-slate-400 mt-1 px-2">{msg.dateEnvoi}</span>
+                  </motion.div>
+                );
+              })
+          )}
           <div ref={messagesEndRef} />
         </div>
 

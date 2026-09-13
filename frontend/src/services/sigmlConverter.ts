@@ -21,6 +21,25 @@ export interface SiGMLConversionResult {
   sequence: SiGMLItem[];
   totalDuration: number;
   dactylologyCount?: number;
+  totalWordCount?: number;
+  translatedWordCount?: number;
+  summaryText?: string;
+}
+
+export function buildDocumentSummary(documentText: string): string {
+  const normalized = documentText.replace(/\s+/g, " ").trim();
+  if (!normalized) return "Aucun contenu de document disponible.";
+  const sentences = normalized.split(/(?<=[.!?])\s+/).filter(Boolean);
+  return (sentences.slice(0, 3).join(" ") || normalized).slice(0, 600);
+}
+
+export function countDocumentWords(documentText: string): number {
+  return documentText
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .split(/[\s,.;:!?()"'«»—]+/)
+    .filter((word) => word.length > 0).length;
 }
 
 /**
@@ -213,6 +232,118 @@ const SIGML_DICTIONARY: Record<string, { gloss: string; hamnosys: string; descri
           <hamtouch/>
         </hamnosys_manual>
       </hns_sign>`
+  },
+  bonjour: {
+    gloss: "BONJOUR",
+    description: "Signe de référence à valider avec un interprète : main ouverte depuis le front vers l'avant",
+    hamnosys: `
+      <hns_sign gloss="BONJOUR">
+        <hamnosys_manual>
+          <hamflathand/>
+          <hampalmout/>
+          <hamforehead/>
+          <hammoveo/>
+        </hamnosys_manual>
+      </hns_sign>`
+  },
+  merci: {
+    gloss: "MERCI",
+    description: "Main ouverte partagée depuis le menton vers l'avant avec élocution de politesse (Paumes sur les côtés)",
+    hamnosys: `
+      <hns_sign gloss="MERCI">
+        <hamflathand/>
+        <hampalmout/>
+        <hamchin/>
+        <hammoveo/>
+      </hns_sign>`
+  },
+  parole: {
+    gloss: "PAROLE / BOUCHE",
+    description: "Main droite portée directement au niveau des lèvres et de la bouche avec mouvance orale",
+    hamnosys: `
+      <hns_sign gloss="PAROLE">
+        <hamfinger2/>
+        <hampalmin/>
+        <hammouth/>
+        <hamtouch/>
+      </hns_sign>`
+  },
+  bouche: {
+    gloss: "BOUCHE",
+    description: "Main droite portée à la bouche",
+    hamnosys: `
+      <hns_sign gloss="BOUCHE">
+        <hamfinger2/>
+        <hampalmin/>
+        <hammouth/>
+        <hamtouch/>
+      </hns_sign>`
+  },
+  bienvenue: {
+    gloss: "BIENVENUE",
+    description: "Salutation amicale et chaleureuse de la main droite agitant près de la tête",
+    hamnosys: `
+      <hns_sign gloss="BIENVENUE">
+        <hamflathand/>
+        <hampalmout/>
+        <hamforehead/>
+        <hammover/>
+      </hns_sign>`
+  },
+  service: {
+    gloss: "SERVICE",
+    description: "Index droit orienté et désignant le guichet administratif",
+    hamnosys: `
+      <hns_sign gloss="SERVICE">
+        <hamfinger2/>
+        <hampalmout/>
+        <hamchest/>
+        <hammoveo/>
+      </hns_sign>`
+  },
+  reclamation: {
+    gloss: "RÉCLAMATION",
+    description: "Soumission formelle de requête avec deux mains portées vers l'avant",
+    hamnosys: `
+      <hns_sign gloss="RÉCLAMATION">
+        <hamflathand/>
+        <hampalmu/>
+        <hamchest/>
+        <hammoveo/>
+      </hns_sign>`
+  },
+  question: {
+    gloss: "QUESTION",
+    description: "Index au menton marquant l'interrogation et la réflexion",
+    hamnosys: `
+      <hns_sign gloss="QUESTION">
+        <hamfinger2/>
+        <hampalmin/>
+        <hamchin/>
+        <hamtouch/>
+      </hns_sign>`
+  },
+  information: {
+    gloss: "INFORMATION",
+    description: "Explication claire avec deux paumes ouvertes présentées au citoyen sur les côtés",
+    hamnosys: `
+      <hns_sign gloss="INFORMATION">
+        <hamflathand/>
+        <hampalmu/>
+        <hamchest/>
+        <hammover/>
+      </hns_sign>`
+  },
+  bravo: {
+    gloss: "BRAVO",
+    description: "Applaudissement joyeux et félicitations officielles",
+    hamnosys: `
+      <hns_sign gloss="BRAVO">
+        <hamflathand/>
+        <hampalmout/>
+        <hamchest/>
+        <hammoveu/>
+      </hns_sign>`
   }
 };
 
@@ -333,6 +464,9 @@ ${sequence.map((item) => item.sigmlSnippet).join("\n")}
     sequence,
     totalDuration: Math.round(totalDuration * 10) / 10,
     dactylologyCount,
+    totalWordCount: words.length,
+    translatedWordCount: sequence.length,
+    summaryText: buildDocumentSummary(documentText),
   };
 }
 
@@ -357,6 +491,9 @@ export async function fetchSiGMLFromLsmApi(
         sequence: data.sequence,
         totalDuration: data.totalDuration,
         dactylologyCount: data.dactylologyCount || 0,
+        totalWordCount: countDocumentWords(documentText),
+        translatedWordCount: Array.isArray(data.sequence) ? data.sequence.length : 0,
+        summaryText: buildDocumentSummary(documentText),
       };
     }
   } catch (err) {

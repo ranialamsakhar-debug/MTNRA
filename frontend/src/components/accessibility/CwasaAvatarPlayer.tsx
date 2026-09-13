@@ -17,6 +17,11 @@ interface CwasaAvatarPlayerProps {
  */
 function mapGlossToMotion(gloss: string): GestureMotionType {
   const g = (gloss || "").toUpperCase();
+  if (g.includes("BONJOUR") || g.includes("SALUT") || g.includes("BIENVENUE")) return "salut-bienvenue";
+  if (g.includes("MERCI") || g.includes("EXPLIC") || g.includes("INFORM")) return "explication-paumes";
+  if (g.includes("QUESTION") || g.includes("REFLEX") || g.includes("ETUDE")) return "reflexion-menton";
+  if (g.includes("BRAVO") || g.includes("APPLAUD")) return "applaudissement";
+  if (g.includes("SERVICE") || g.includes("ORIENT") || g.includes("DIRECT")) return "pointage-direction";
   if (g.includes("ROYAUME")) return "couronne";
   if (g.includes("MAROC")) return "etoile";
   if (g.includes("MINIST")) return "salut-solennel";
@@ -27,7 +32,7 @@ function mapGlossToMotion(gloss: string): GestureMotionType {
   if (g.includes("CITOY")) return "main-coeur";
   if (g.includes("SIGNAT")) return "ecriture-paume";
   if (g.includes("HORODAT") || g.includes("TSA")) return "clock-tsa";
-  return "salut-solennel";
+  return "explication-paumes";
 }
 
 export const CwasaAvatarPlayer: React.FC<CwasaAvatarPlayerProps> = ({
@@ -186,6 +191,9 @@ export const CwasaAvatarPlayer: React.FC<CwasaAvatarPlayerProps> = ({
           <ThreeDHumanAvatar
             motion={activeMotion}
             glossText={currentItem?.gloss}
+            sigmlXml={sigmlData.sigmlXml}
+            gestureIndex={currentGlossIndex}
+            gestureDurations={sigmlData.sequence.map((item) => item.duration)}
             speed={speed}
             isPlaying={isPlaying}
           />

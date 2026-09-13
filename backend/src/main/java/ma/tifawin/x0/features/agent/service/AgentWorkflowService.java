@@ -20,6 +20,7 @@ public class AgentWorkflowService {
     private final AgentValidationRepository agentValidationRepository;
     private final AgentCertificationRepository agentCertificationRepository;
     private final AgentSignatureRepository agentSignatureRepository;
+        private final SignatureSimpleRepository signatureSimpleRepository;
     private final HistoriqueActionRepository historiqueActionRepository;
     private final NotificationRepository notificationRepository;
 
@@ -116,6 +117,10 @@ public class AgentWorkflowService {
         Dossier dossier = chargerDossier(dossierId);
         verifierStatut(dossier, DossierStatut.EN_SIGNATURE);
 
+                if (!signatureSimpleRepository.existsByDossier_IdDossier(dossierId)) {
+                        throw new IllegalStateException("Le dossier doit être signé par l'agent de signature avant sa clôture");
+                }
+
         dossier.setStatut(DossierStatut.CLOTURE);
         dossier.setDateCloture(LocalDateTime.now());
 
@@ -124,6 +129,34 @@ public class AgentWorkflowService {
 
         return dossierRepository.save(dossier);
     }
+
+        @Transactional
+        public Dossier signerDossier(Long dossierId, Long agentSignatureId, String imageSignature) {
+                Dossier dossier = chargerDossier(dossierId);
+                verifierStatut(dossier, DossierStatut.EN_SIGNATURE);
+
+                AgentSignature agent = agentSignatureRepository.findById(agentSignatureId)
+                                .orElseThrow(() -> new RuntimeException("Agent de signature introuvable"));
+
+                if (dossier.getAgentSignature() == null || !dossier.getAgentSignature().getId().equals(agent.getId())) {
+                        throw new IllegalStateException("Cet agent n'est pas habilité à signer ce dossier");
+                }
+                if (imageSignature == null || imageSignature.isBlank()) {
+                        throw new IllegalArgumentException("La signature dessinée est obligatoire");
+                }
+
+                SignatureSimple signature = new SignatureSimple();
+                signature.setDossier(dossier);
+                signature.setCitoyen(dossier.getCitoyen());
+                signature.setAgentSignature(agent);
+                signature.setDateSignature(LocalDateTime.now());
+                signature.setImageSignature(imageSignature);
+                signatureSimpleRepository.save(signature);
+
+                enregistrerHistorique(dossier, agent, TypeAction.SIGNATURE,
+                                "Signature dessinée apposée par l'agent de signature");
+                return dossier;
+        }
 
     // ──────────────────────────────────────────────
     //  Rejet du dossier (depuis n'importe quelle étape de traitement)
@@ -152,6 +185,16 @@ public class AgentWorkflowService {
 
         enregistrerHistorique(dossier, agent, TypeAction.REJET,
                 "Dossier rejeté. Motif : " + (motif != null ? motif : "Non spécifié"));
+
+        Notification notification = new Notification();
+        notification.setContenu("Votre dossier " + dossier.getNumeroDossier() + " a été rejeté. Motif : "
+                + (motif != null ? motif : "Non spécifié")
+                + ". Vous pouvez saisir le médiateur depuis votre espace citoyen.");
+        notification.setDateEnvoi(LocalDateTime.now());
+        notification.setCanal(ma.tifawin.x0.common.enums.NotificationCanal.EMAIL);
+        notification.setDestinataire(dossier.getCitoyen());
+        notification.setDossier(dossier);
+        notificationRepository.save(notification);
 
         return dossierRepository.save(dossier);
     }
