@@ -6,5 +6,10 @@ export default defineConfig({
   server: {
     host: true,
     port: 5173
+  },
+  build: {
+    target: "esnext",
+    minify: false,
+    chunkSizeWarningLimit: 5000
   }
 });

@@ -9,6 +9,8 @@ import logging
 import os
 import base64
 import json
+import re
+import unicodedata
 from typing import List, Tuple, Optional
 from pathlib import Path
 import urllib.request
@@ -401,14 +403,130 @@ async def get_vocabulary(standard: Optional[str] = "UNIVERSEL"):
     )
 
 
+# ── Models pour l'API de Traduction Document vers Avatar SiGML ──
+
+class TranslateDocumentRequest(BaseModel):
+    documentText: str
+    standard: Optional[str] = "LSM"
+    avatar: Optional[str] = "marc"
+
+class SignAvatarItemResponse(BaseModel):
+    word: str
+    gloss: str
+    sigmlSnippet: str
+    duration: float
+    description: str
+
+class TranslateDocumentResponse(BaseModel):
+    documentTitle: str
+    standardUsed: str
+    avatarModel: str
+    sigmlXml: str
+    sequence: List[SignAvatarItemResponse]
+    totalDuration: float
+    status: str
+
+SIGML_LEXICON = {
+    "royaume": ("ROYAUME", "<hns_sign gloss=\"ROYAUME\"><hamnosys_manual><hamflathand/><hamextfingeru/><hampalml/><hamhead/><hamabove/><hammoveu/></hamnosys_manual></hns_sign>", "Couronne royale s'élevant au-dessus de la tête"),
+    "maroc": ("MAROC", "<hns_sign gloss=\"MAROC\"><hamnosys_manual><hamfinger2/><hamextfingeru/><hampalmd/><hamchest/><hammover/></hamnosys_manual></hns_sign>", "Dessin d'étoile à 5 branches avec index tendu"),
+    "ministere": ("MINISTÈRE", "<hns_sign gloss=\"MINISTÈRE\"><hamnosys_manual><hamflathand/><hamextfingert/><hampalmin/><hamchest/><hamtouch/></hamnosys_manual></hns_sign>", "Main au cœur et salut solennel officiel"),
+    "decision": ("DÉCISION", "<hns_sign gloss=\"DÉCISION\"><hamnosys_manual><hamfist/><hamextfingerd/><hampalmin/><hamchest/><hammoved/></hamnosys_manual></hns_sign>", "Tampon de validation : poing droit sur paume gauche"),
+    "autorisation": ("AUTORISATION", "<hns_sign gloss=\"AUTORISATION\"><hamnosys_manual><hamflathand/><hamextfingeru/><hampalmout/><hamchest/><hammoveo/></hamnosys_manual></hns_sign>", "Sceau officiel validé avec paume ouverte"),
+    "acceptation": ("ACCEPTATION", "<hns_sign gloss=\"ACCEPTATION\"><hamnosys_manual><hamthumb/><hamextfingeru/><hampalml/><hamchest/><hammoveu/></hamnosys_manual><hamnosys_nonmanual><hnm_nod nod=\"single\"/></hamnosys_nonmanual></hns_sign>", "Pouce levé avec hochement affirmatif"),
+    "signature": ("SIGNATURE", "<hns_sign gloss=\"SIGNATURE\"><hamnosys_manual><hampinch12/><hamextfingerd/><hampalml/><hamchest/><hamtouch/><hammoveo/></hamnosys_manual></hns_sign>", "Main droite traçant une signature sur paume gauche"),
+    "horodatage": ("HORODATAGE_TSA", "<hns_sign gloss=\"HORODATAGE_TSA\"><hamnosys_manual><hamfinger2/><hamextfingerd/><hampalml/><hamwrist/><hamtouch/></hamnosys_manual></hns_sign>", "Pointage de l'horloge officielle au poignet")
+}
+
+@app.post("/api/sign-language/translate-document", response_model=TranslateDocumentResponse)
+async def translate_document_to_avatar_sigml(payload: TranslateDocumentRequest):
+    """
+    API officielle du service IA LSM / Avatar 3D :
+    Convertit le texte d'un document administratif (issu de l'Agent de Signature)
+    en payload XML SiGML et séquence d'animation pour l'Avatar Traducteur (TalkSign).
+    """
+    text = payload.documentText or "Décision administrative officielle."
+    standard = payload.standard or "LSM"
+    avatar = payload.avatar or "marc"
+
+    words = [w for w in text.split() if w.strip()]
+    sequence: List[SignAvatarItemResponse] = []
+    total_dur = 0.0
+
+    for raw_word in words:
+        normalized_word = unicodedata.normalize("NFD", raw_word.lower())
+        normalized_word = "".join(char for char in normalized_word if unicodedata.category(char) != "Mn")
+        w = re.sub(r"[^a-z0-9]", "", normalized_word)
+        if not w:
+            continue
+
+        matched = False
+        for key, (gloss, snippet, desc) in SIGML_LEXICON.items():
+            if key in w or w in key:
+                sequence.append(SignAvatarItemResponse(
+                    word=raw_word,
+                    gloss=gloss,
+                    sigmlSnippet=snippet,
+                    duration=1.05,
+                    description=desc
+                ))
+                total_dur += 1.05
+                matched = True
+                break
+
+        if not matched:
+            # Preserve every document word instead of ending the translation
+            # at the last item found in the administrative lexicon.
+            spelled = w.upper()
+            sequence.append(SignAvatarItemResponse(
+                word=raw_word,
+                gloss=f"EPELLATION: {spelled}",
+                sigmlSnippet=(
+                    f'<hns_sign gloss="{spelled}">'
+                    "<hamnosys_manual><hamfinger2/><hamextfingeru/>"
+                    "<hampalmout/><hamchest/><hammoveo/></hamnosys_manual>"
+                    "</hns_sign>"
+                ),
+                duration=max(0.8, len(spelled) * 0.18),
+                description=f"Dactylologie du mot {raw_word}"
+            ))
+            total_dur += max(0.8, len(spelled) * 0.18)
+
+    if not sequence:
+        for key in ["royaume", "maroc", "decision", "autorisation", "acceptation", "signature"]:
+            gloss, snippet, desc = SIGML_LEXICON[key]
+            sequence.append(SignAvatarItemResponse(
+                word=key.upper(),
+                gloss=gloss,
+                sigmlSnippet=snippet,
+                duration=1.05,
+                description=desc
+            ))
+            total_dur += 1.05
+
+    snippets = [item.sigmlSnippet for item in sequence]
+    sigml_xml = f"<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<sigml>\n" + "\n".join(snippets) + "\n</sigml>"
+
+    return TranslateDocumentResponse(
+        documentTitle=text[:60] + "...",
+        standardUsed=standard,
+        avatarModel=avatar,
+        sigmlXml=sigml_xml,
+        sequence=sequence,
+        totalDuration=round(total_dur, 1),
+        status="success"
+    )
+
+
 @app.get("/health")
 async def health():
     return {
         "status": "ok",
         "service": "lsm-service",
         "mode": "mediapipe_resnet_bilstm_ctc",
-        "architecture": "MediaPipe HandLandmarker + ResNet-18 + BiLSTM + CTC",
+        "architecture": "MediaPipe HandLandmarker + ResNet-18 + BiLSTM + CTC + Sign Avatar SiGML Translation API",
         "model_loaded": model is not None,
         "vocabulary_size": NUM_CLASSES,
         "endpoint_frames": "/api/sign-language/recognize-frames",
+        "endpoint_avatar_translate": "/api/sign-language/translate-document",
     }
+

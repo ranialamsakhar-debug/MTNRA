@@ -2,12 +2,14 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { SignLanguageModal } from "../accessibility/SignLanguageModal";
 import { VoiceAssistantModal } from "../accessibility/VoiceAssistantModal";
+import { EchoTalkSignModal } from "../accessibility/EchoTalkSignModal";
 import { CniPhotoModal } from "./CniPhotoModal";
 import { useAuthStore } from "../../store/authStore";
 import { useUIStore } from "../../store/uiStore";
 
 export function Navbar() {
   const [isLSMOpen, setIsLSMOpen] = useState(false);
+  const [isEchoTalkSignOpen, setIsEchoTalkSignOpen] = useState(false);
   const [isVoiceOpen, setIsVoiceOpen] = useState(false);
   const [isCniOpen, setIsCniOpen] = useState(false);
   const { lang: selectedLang, setLang: setSelectedLang } = useUIStore();
@@ -112,12 +114,21 @@ export function Navbar() {
               </div>
             </div>
 
+            {/* Bouton d'accessibilité Avatar Traducteur visible pour TOUS les utilisateurs */}
+            <button
+              onClick={() => setIsEchoTalkSignOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 via-amber-600 to-amber-500 text-slate-950 text-xs font-black shadow-md hover:scale-105 transition duration-200 cursor-pointer border border-amber-300 ring-2 ring-amber-400/30 ml-2"
+              title="Echo 1.0 TalkSign : Avatar 3D Traducteur de Documents"
+            >
+              <span className="text-sm">🤟</span>
+              <span>Echo 1.0 TalkSign</span>
+            </button>
+
             {user && (
               <>
-                {/* Bouton d'accessibilité Vocale (STT & TTS) */}
                 <button
                   onClick={() => setIsVoiceOpen(true)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 border border-slate-200 text-slate-800 text-xs font-semibold hover:bg-white transition cursor-pointer ml-1"
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-100 border border-slate-200 text-slate-800 text-xs font-semibold hover:bg-white transition cursor-pointer ml-1"
                   title="Accessibilité : Assistant Vocal"
                 >
                   <svg className="w-3.5 h-3.5 text-slate-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -126,10 +137,9 @@ export function Navbar() {
                   <span>Vocal</span>
                 </button>
 
-                {/* Bouton d'accessibilité Langue des Signes */}
                 <button
                   onClick={() => setIsLSMOpen(true)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 border border-slate-200 text-slate-800 text-xs font-semibold hover:bg-white transition cursor-pointer"
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-100 border border-slate-200 text-slate-800 text-xs font-semibold hover:bg-white transition cursor-pointer"
                   title="Accessibilité : Langue des Signes"
                 >
                   <svg className="w-3.5 h-3.5 text-slate-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -143,10 +153,29 @@ export function Navbar() {
         </div>
       </header>
 
+      {/* BOUTON FLOTTANT PERMANENT (Visible pour TOUS les visiteurs) */}
+      <div className="fixed bottom-6 right-6 z-[9990] flex flex-col items-end gap-2 pointer-events-auto">
+        <button
+          onClick={() => setIsEchoTalkSignOpen(true)}
+          className="bg-gradient-to-tr from-[#cda351] via-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 px-4 py-3 rounded-2xl font-black text-xs shadow-2xl border-2 border-amber-300 flex items-center gap-2.5 transition-all duration-300 hover:scale-110 active:scale-95 group cursor-pointer"
+        >
+          <span className="text-xl group-hover:rotate-12 transition-transform">🤟</span>
+          <div className="flex flex-col text-left">
+            <span className="text-[10px] uppercase font-black tracking-wider text-slate-900/80 leading-none">Accessibilité IA</span>
+            <span className="font-extrabold text-xs text-slate-950">Avatar Echo 1.0 TalkSign</span>
+          </div>
+        </button>
+      </div>
+
       {/* Modals */}
       <SignLanguageModal
         isOpen={isLSMOpen}
         onClose={() => setIsLSMOpen(false)}
+      />
+
+      <EchoTalkSignModal
+        isOpen={isEchoTalkSignOpen}
+        onClose={() => setIsEchoTalkSignOpen(false)}
       />
 
       <VoiceAssistantModal

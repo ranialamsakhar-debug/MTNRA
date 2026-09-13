@@ -1,4 +1,6 @@
+import { useState } from "react";
 import { motion } from "framer-motion";
+import { EchoTalkSignModal } from "../accessibility/EchoTalkSignModal";
 
 interface OfficialPermissionSheetProps {
   dossierId: string;
@@ -25,53 +27,79 @@ export function OfficialPermissionSheet({
 }: OfficialPermissionSheetProps) {
 
   const defaultHash = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
+  const [isEchoTalkSignOpen, setIsEchoTalkSignOpen] = useState(false);
 
-  const handlePrint = () => {
+  // Génération / Impression / Enregistrement PDF natif avec le design identique du site
+  const handleDownloadPDF = () => {
+    const originalTitle = document.title;
+    document.title = `Acte_Officiel_${dossierId}_Tawsa`;
     window.print();
+    setTimeout(() => {
+      document.title = originalTitle;
+    }, 1000);
   };
 
+  const documentContentText = `Royaume du Maroc. Ministère de la Transition Numérique et de la Réforme de l'Administration.
+Plateforme Nationale Tawsa • Service Central des Actes Numériques.
+Décision Administrative d'Autorisation Officielle N° ${dossierId}. Date: ${dateSignature}.
+ARTICLE 1ER — ACCEPTATION ET AUTORISATION DÉFINITIVE: La demande déposée par ${citoyenNom} (CNI: ${cni}) concernant « ${titre} » est déclarée DÉFINITIVEMENT ACCEPTÉE ET APPROUVÉE.
+ARTICLE 2 — DROITS ET EFFETS JURIDIQUES: Le présent acte vaut autorisation légale d'exécution. Horodatage TSA: ${tsaTimestamp}.`;
+
   return (
-    <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-md overflow-y-auto font-sans">
+    <div className="fixed inset-0 z-[99999] overflow-y-auto p-4 md:p-6 bg-slate-900/80 backdrop-blur-md font-sans print:p-0 print:bg-white flex justify-center items-start">
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.95 }}
-        className="bg-white rounded-3xl max-w-3xl w-full shadow-2xl border border-slate-200 overflow-hidden my-8"
+        className="bg-white rounded-3xl max-w-3xl w-full shadow-2xl border border-slate-200 overflow-hidden my-6 md:my-10 print:my-0 print:shadow-none print:border-none print:w-full print:max-w-none relative"
       >
-        {/* Barre d'outils supérieure */}
-        <div className="bg-slate-900 text-white p-4 px-6 flex items-center justify-between">
+        {/* Barre d'outils supérieure fixe (Sticky) avec boutons Télécharger PDF, Avatar Echo 1.0 et Fermer */}
+        <div className="bg-slate-900 text-white p-4 px-6 flex flex-wrap items-center justify-between gap-3 sticky top-0 z-30 print:hidden border-b border-slate-800 shadow-md">
           <div className="flex items-center gap-2">
             <span className="bg-slate-800 text-slate-200 text-xs font-bold px-3 py-1 rounded-full border border-slate-700 flex items-center gap-1.5">
-              <span>📜</span> Document Officiel Approuvé & Signé
+              <span>📜</span> Document Officiel Signé (Format PDF)
             </span>
           </div>
-          <div className="flex items-center gap-3">
+          
+          <div className="flex items-center gap-2">
+            {/* Bouton Traduction Avatar Echo 1.0 */}
             <button
-              onClick={handlePrint}
-              className="bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold px-3.5 py-2 rounded-xl shadow transition-all flex items-center gap-1.5 border border-slate-700"
+              onClick={() => setIsEchoTalkSignOpen(true)}
+              className="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 text-xs font-black px-4 py-2 rounded-xl shadow transition-all flex items-center gap-1.5 cursor-pointer border border-amber-300"
             >
-              <span>🖨️</span> Imprimer / Enregistrer PDF
+              <span>🤟</span> Traduire via Avatar Echo 1.0
             </button>
+
+            {/* Bouton Enregistrer au Format PDF Identique */}
+            <button
+              onClick={handleDownloadPDF}
+              className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black px-4 py-2 rounded-xl shadow transition-all flex items-center gap-1.5 border border-emerald-500 cursor-pointer"
+            >
+              <span>📥</span> Enregistrer au Format PDF
+            </button>
+
+            {/* Bouton Fermer */}
             {onClose && (
               <button
                 onClick={onClose}
-                className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold flex items-center justify-center text-sm"
+                className="bg-red-600 hover:bg-red-500 text-white text-xs font-black px-3.5 py-2 rounded-xl shadow transition-all flex items-center gap-1 cursor-pointer border border-red-500 ml-1"
+                title="Fermer la fenêtre du document"
               >
-                ✕
+                <span>✕</span> Fermer
               </button>
             )}
           </div>
         </div>
 
-        {/* Feuille de décision officielle imprimable */}
-        <div className="p-8 md:p-12 space-y-8 bg-slate-50/50 text-slate-900 relative print:p-0">
+        {/* Feuille de décision officielle (Rendu visuel exact conservé pour le PDF) */}
+        <div id="official-document-render" className="p-8 md:p-12 space-y-8 bg-slate-50/50 text-slate-900 relative print:p-6 print:bg-white">
           
           {/* Filigrane d'authenticité haché en arrière-plan */}
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.03] select-none font-black text-9xl text-slate-900 rotate-[-30deg]">
             TAWSA GOV
           </div>
 
-          {/* En-tête Gouvernemental */}
+          {/* En-tête Gouvernemental Officiel */}
           <div className="text-center border-b-2 border-slate-900 pb-6 space-y-2">
             <div className="flex items-center justify-between text-xs font-bold text-slate-700 uppercase tracking-widest">
               <div>Royaume du Maroc</div>
@@ -86,7 +114,28 @@ export function OfficialPermissionSheet({
             </p>
           </div>
 
-          {/* Titre de l'Arrêté */}
+          {/* Bannière d'Accessibilité - Avatar Traducteur Echo 1.0 (Directement visible dans le corps du document) */}
+          <div className="p-4 rounded-2xl bg-amber-50 border-2 border-amber-300 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm print:hidden">
+            <div className="flex items-center gap-3">
+              <span className="text-2xl p-2.5 bg-amber-100/80 rounded-2xl border border-amber-200">🤟</span>
+              <div>
+                <h4 className="font-extrabold text-xs text-amber-950 uppercase tracking-wider">
+                  Traduction par Avatar IA (Echo 1.0 TalkSign)
+                </h4>
+                <p className="text-[11px] text-amber-900 font-semibold mt-0.5">
+                  Voir l'avatar animé traduire les articles de cet acte officiel en direct (LSM / LSF / ASL / Universel).
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => setIsEchoTalkSignOpen(true)}
+              className="px-4 py-2.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs rounded-xl shadow transition cursor-pointer border border-amber-400 shrink-0 self-start sm:self-auto"
+            >
+              🤟 Lancer l'Avatar Traducteur
+            </button>
+          </div>
+
+          {/* Titre de l'Arrêté Officiel */}
           <div className="text-center space-y-2 py-2">
             <span className="inline-block bg-slate-900 text-white font-extrabold text-xs px-4 py-1.5 rounded-full uppercase tracking-widest shadow-sm">
               Décision Administrative d'Autorisation Officielle
@@ -183,17 +232,44 @@ export function OfficialPermissionSheet({
             </div>
           </div>
 
-          {/* Pied de page avec QR Code & Barcode */}
-          <div className="pt-4 border-t border-slate-200 flex items-center justify-between text-[10px] text-slate-500 font-mono">
-            <div>
+          {/* Pied de page avec QR Code, Boutons d'Action et Lien de fermeture */}
+          <div className="pt-6 border-t border-slate-200 flex flex-col md:flex-row items-center justify-between gap-4 text-xs font-mono">
+            <div className="text-[10px] text-slate-500">
               Vérification d'authenticité: https://tawsa.gov.ma/verify/{dossierId}
             </div>
-            <div className="font-bold text-slate-800">
-              RÉPUBLIQUE MAROCAINE • ACTE SÉCURISÉ NUMÉRIQUE
+
+            <div className="flex items-center gap-3 print:hidden">
+              <button
+                onClick={handleDownloadPDF}
+                className="px-4 py-2 bg-emerald-700 hover:bg-emerald-600 text-white font-black rounded-xl text-xs transition cursor-pointer shadow-sm flex items-center gap-1.5"
+              >
+                <span>📥</span> Enregistrer au Format PDF
+              </button>
+
+              {onClose && (
+                <button
+                  onClick={onClose}
+                  className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white font-black rounded-xl text-xs transition cursor-pointer shadow-sm flex items-center gap-1"
+                >
+                  <span>✕</span> Fermer la feuille
+                </button>
+              )}
             </div>
           </div>
         </div>
       </motion.div>
+
+      {/* Modale Traducteur Avatar Echo 1.0 */}
+      <EchoTalkSignModal
+        isOpen={isEchoTalkSignOpen}
+        onClose={() => setIsEchoTalkSignOpen(false)}
+        documentData={{
+          title: `Décision Officielle - ${titre}`,
+          dossierId: dossierId,
+          citoyenNom: citoyenNom,
+          content: documentContentText,
+        }}
+      />
     </div>
   );
 }

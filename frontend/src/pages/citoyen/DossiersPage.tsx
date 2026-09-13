@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
 import { useUIStore } from "../../store/uiStore";
@@ -6,6 +6,18 @@ import { useDossierStore, DossierItem, DocumentItem } from "../../store/dossierS
 import { useAuthStore } from "../../store/authStore";
 import { OfficialPermissionSheet } from "../../components/common/OfficialPermissionSheet";
 import { compressImageIfNeeded } from "../../utils/imageCompressor";
+import { EchoTalkSignModal } from "../../components/accessibility/EchoTalkSignModal";
+
+interface SignedDocument {
+  id: string;
+  title: string;
+  citoyenNom: string;
+  citoyenEmail: string;
+  content: string;
+  sentAt: string;
+}
+
+const SIGNED_DOCUMENTS_STORAGE_KEY = "tawsa_signed_documents";
 
 const translations: Record<string, any> = {
   FR: { title: "📁 Suivi & Historique de vos Réclamations" },
@@ -23,6 +35,29 @@ export function DossiersPage() {
   const [selectedDossier, setSelectedDossier] = useState<DossierItem | null>(null);
   const [selectedDocPreview, setSelectedDocPreview] = useState<DocumentItem | null>(null);
   const [selectedSheetDossier, setSelectedSheetDossier] = useState<DossierItem | null>(null);
+  const [signedDocuments, setSignedDocuments] = useState<SignedDocument[]>([]);
+  const [selectedSignedDocument, setSelectedSignedDocument] = useState<SignedDocument | null>(null);
+
+  const loadSignedDocuments = () => {
+    try {
+      const stored = JSON.parse(localStorage.getItem(SIGNED_DOCUMENTS_STORAGE_KEY) || "[]");
+      setSignedDocuments(Array.isArray(stored) ? stored : []);
+    } catch {
+      setSignedDocuments([]);
+    }
+  };
+
+  useEffect(() => {
+    loadSignedDocuments();
+    window.addEventListener("storage", loadSignedDocuments);
+    return () => window.removeEventListener("storage", loadSignedDocuments);
+  }, []);
+
+  const receivedSignedDocuments = signedDocuments.filter((document) => {
+    if (!user) return false;
+    return document.citoyenEmail === user.email ||
+      document.citoyenNom.toLowerCase() === `${user.prenom} ${user.nom}`.toLowerCase();
+  });
 
   // Modale pour l'ajout de pièces complémentaires urgentes sans recréer de réclamation
   const [urgentTargetDossier, setUrgentTargetDossier] = useState<DossierItem | null>(null);
@@ -91,6 +126,38 @@ export function DossiersPage() {
 
   return (
     <div className="space-y-6" dir={lang === "AR" ? "rtl" : "ltr"}>
+      {receivedSignedDocuments.length > 0 && (
+        <motion.section
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-slate-950 text-white rounded-3xl p-6 shadow-xl border border-amber-400/40 space-y-4"
+        >
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+            <div>
+              <span className="text-[10px] uppercase tracking-wider text-amber-300 font-black">Document reçu de l'agent de signature</span>
+              <h2 className="text-lg font-black mt-1">Vos documents signés sont prêts à être lus en signes</h2>
+            </div>
+            <span className="text-xs font-bold text-slate-300">{receivedSignedDocuments.length} document(s)</span>
+          </div>
+          <div className="grid gap-3">
+            {receivedSignedDocuments.map((document) => (
+              <div key={document.id} className="bg-white/10 border border-white/10 rounded-2xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs font-black text-white">{document.id} — {document.title}</p>
+                  <p className="text-[11px] text-slate-300 mt-1">Envoyé le {new Date(document.sentAt).toLocaleString("fr-FR")}</p>
+                </div>
+                <button
+                  onClick={() => setSelectedSignedDocument(document)}
+                  className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs rounded-xl transition cursor-pointer"
+                >
+                  🤟 Traduire en signes
+                </button>
+              </div>
+            ))}
+          </div>
+        </motion.section>
+      )}
+
       {/* ALERTE NOTIFICATION PERMANENTE CITOYEN DE DEMANDE DE PIÈCES OU COMMENTAIRE */}
       {pendingNotificationDossier && (
         <motion.div
@@ -565,6 +632,17 @@ export function DossiersPage() {
           onClose={() => setSelectedSheetDossier(null)}
         />
       )}
+
+      <EchoTalkSignModal
+        isOpen={Boolean(selectedSignedDocument)}
+        onClose={() => setSelectedSignedDocument(null)}
+        documentData={selectedSignedDocument ? {
+          title: selectedSignedDocument.title,
+          dossierId: selectedSignedDocument.id,
+          citoyenNom: selectedSignedDocument.citoyenNom,
+          content: selectedSignedDocument.content,
+        } : null}
+      />
     </div>
   );
 }

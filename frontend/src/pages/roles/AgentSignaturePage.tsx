@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { SignatureCanvasModal } from "../../components/common/SignatureCanvasModal";
 import { OfficialPermissionSheet } from "../../components/common/OfficialPermissionSheet";
 import { HistoriqueGlobalDemandesModal } from "../../components/common/HistoriqueGlobalDemandesModal";
+import { EchoTalkSignModal } from "../../components/accessibility/EchoTalkSignModal";
 
 interface SignatureDoc {
   id: string;
@@ -13,6 +14,8 @@ interface SignatureDoc {
   tsaTimestamp?: string;
   selectedBatch?: boolean;
 }
+
+const SIGNED_DOCUMENTS_STORAGE_KEY = "tawsa_signed_documents";
 
 export function AgentSignaturePage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -45,6 +48,7 @@ export function AgentSignaturePage() {
   const [isCanvasOpen, setIsCanvasOpen] = useState(false);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [isEchoTalkSignOpen, setIsEchoTalkSignOpen] = useState(false);
   const [signatureDataUrl, setSignatureDataUrl] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"EN_COURS" | "TRAITES">("EN_COURS");
 
@@ -95,6 +99,33 @@ export function AgentSignaturePage() {
 
   const handleSendToCitizen = () => {
     if (!selectedDoc) return;
+    const signedContent = [
+      "Royaume du Maroc. Ministère de la Transition Numérique et de la Réforme de l'Administration.",
+      `Décision Administrative d'Autorisation N° ${selectedDoc.id}.`,
+      `Objet : ${selectedDoc.titre}.`,
+      `Citoyen bénéficiaire : ${selectedDoc.citoyen}.`,
+      `Statut du document : SIGNE ET ENVOYE.`,
+      selectedDoc.tsaTimestamp ? `Horodatage TSA : ${selectedDoc.tsaTimestamp}.` : "Document signé électroniquement par l'agent habilité.",
+    ].join("\n");
+
+    const signedDocument = {
+      id: selectedDoc.id,
+      title: selectedDoc.titre,
+      citoyenNom: selectedDoc.citoyen,
+      citoyenEmail: selectedDoc.email,
+      content: signedContent,
+      sentAt: new Date().toISOString(),
+    };
+
+    try {
+      const stored = JSON.parse(localStorage.getItem(SIGNED_DOCUMENTS_STORAGE_KEY) || "[]");
+      const documents = Array.isArray(stored) ? stored : [];
+      const withoutCurrent = documents.filter((document: { id?: string }) => document.id !== signedDocument.id);
+      localStorage.setItem(SIGNED_DOCUMENTS_STORAGE_KEY, JSON.stringify([...withoutCurrent, signedDocument]));
+    } catch (error) {
+      console.error("Erreur de transmission du document signé", error);
+    }
+
     setDocs((prev) =>
       prev.map((d) => (d.id === selectedId ? { ...d, statut: "ENVOYE" } : d))
     );
@@ -164,6 +195,12 @@ export function AgentSignaturePage() {
         </div>
 
         <div className="flex items-center gap-3">
+          <button
+            onClick={() => setIsEchoTalkSignOpen(true)}
+            className="px-4 py-2.5 bg-[#cda351] hover:bg-amber-600 text-slate-950 font-black text-xs rounded-xl shadow-md transition flex items-center gap-2 cursor-pointer border border-amber-300"
+          >
+            <span>🤟</span> <span>Avatar Echo 1.0 TalkSign</span>
+          </button>
           <button
             onClick={() => setIsHistoryOpen(true)}
             className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-md transition flex items-center gap-2"
@@ -376,6 +413,22 @@ export function AgentSignaturePage() {
       <HistoriqueGlobalDemandesModal
         isOpen={isHistoryOpen}
         onClose={() => setIsHistoryOpen(false)}
+      />
+
+      {/* Modale Traducteur Avatar Echo 1.0 TalkSign */}
+      <EchoTalkSignModal
+        isOpen={isEchoTalkSignOpen}
+        onClose={() => setIsEchoTalkSignOpen(false)}
+        documentData={
+          selectedDoc
+            ? {
+                title: selectedDoc.titre,
+                dossierId: selectedDoc.id,
+                citoyenNom: selectedDoc.citoyen,
+                content: `Royaume du Maroc. Ministère de la Transition Numérique et de la Réforme de l'Administration.\nDécision Administrative d'Autorisation N° ${selectedDoc.id}.\nObjet : ${selectedDoc.titre}.\nCitoyen bénéficiaire : ${selectedDoc.citoyen}.\nStatut du document : ${selectedDoc.statut}.\nARTICLE 1ER — ACCEPTATION ET AUTORISATION DÉFINITIVE. La présente autorisation est approuvée avec Horodatage TSA certifié.`,
+              }
+            : null
+        }
       />
     </div>
   );
