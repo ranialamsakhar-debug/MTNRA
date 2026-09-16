@@ -61,6 +61,17 @@ export interface DossierItem {
   motifDemandePiece?: string;
   remarqueAgent?: string;
   historiqueActions?: DossierActionHistory[];
+
+  // Médiation : affectation par le responsable service
+  mediateurAffecte?: AgentInfo;
+  instructionsMediateur?: string;
+  // Pièces demandées par le médiateur au citoyen
+  documentsDemandesParMediateur?: string[];
+  demandeDocumentsMediateur?: boolean;
+  // Validation et signature par le médiateur
+  acteMediationSigne?: boolean;
+  dateSignatureMediation?: string;
+  signatureMediationDataUrl?: string;
 }
 
 const SAMPLE_DOSSIERS: DossierItem[] = [
@@ -169,6 +180,9 @@ interface DossierState {
   requestAdditionalDocuments: (dossierId: string, motif: string, agentName: string) => void;
   updateDossierDecision: (dossierId: string, newStatut: DossierItem["statut"], commentaire: string, agentName: string, agentRole: string) => void;
   getDossierByNumero: (numero: string) => DossierItem | undefined;
+  affecterMediateur: (dossierId: string, mediateur: AgentInfo, instructions: string, responsableName: string) => void;
+  demanderDocumentsMediateur: (dossierId: string, documentsDemandes: string[], mediateurName: string) => void;
+  validerEtSignerParMediateur: (dossierId: string, mediateurName: string, signatureDataUrl: string, observation: string) => void;
 }
 
 const getInitialDossiers = (): DossierItem[] => {
@@ -293,5 +307,140 @@ export const useDossierStore = create<DossierState>((set, get) => ({
 
   getDossierByNumero: (numero: string) => {
     return get().dossiers.find(d => d.numeroDossier === numero || d.id === numero);
+  },
+
+  affecterMediateur: (dossierId: string, mediateur: AgentInfo, instructions: string, responsableName: string) => {
+    set((state) => {
+      const nowFormatted = new Date().toISOString().replace('T', ' ').substring(0, 16);
+      const updated = state.dossiers.map(dossier => {
+        if (dossier.id === dossierId || dossier.numeroDossier === dossierId) {
+          const actionHistory: DossierActionHistory = {
+            id: 'act-' + Date.now(),
+            date: nowFormatted,
+            auteur: responsableName,
+            auteurRole: 'Responsable Service',
+            action: 'QUALIFICATION',
+            commentaire: `Médiateur affecté : ${mediateur.prenom} ${mediateur.nom}. Instructions : ${instructions}`
+          };
+          return {
+            ...dossier,
+            mediateurAffecte: mediateur,
+            instructionsMediateur: instructions,
+            historiqueActions: [...(dossier.historiqueActions || []), actionHistory]
+          };
+        }
+        return dossier;
+      });
+      try {
+        localStorage.setItem('tawsa_dossiers', JSON.stringify(updated));
+      } catch (e) {
+        console.error('Erreur sauvegarde affectation médiateur', e);
+      }
+      return { dossiers: updated };
+    });
+  },
+
+  demanderDocumentsMediateur: (dossierId: string, documentsDemandes: string[], mediateurName: string) => {
+    set((state) => {
+      const nowFormatted = new Date().toISOString().replace('T', ' ').substring(0, 16);
+      const updated = state.dossiers.map(dossier => {
+        if (dossier.id === dossierId || dossier.numeroDossier === dossierId) {
+          const actionHistory: DossierActionHistory = {
+            id: 'act-' + Date.now(),
+            date: nowFormatted,
+            auteur: mediateurName,
+            auteurRole: 'Médiateur',
+            action: 'DEMANDE_PIECE',
+            commentaire: `Le médiateur demande les pièces suivantes : ${documentsDemandes.join(', ')}`
+          };
+          return {
+            ...dossier,
+            documentsDemandesParMediateur: documentsDemandes,
+            demandeDocumentsMediateur: true,
+            historiqueActions: [...(dossier.historiqueActions || []), actionHistory]
+          };
+        }
+        return dossier;
+      });
+      try {
+        localStorage.setItem('tawsa_dossiers', JSON.stringify(updated));
+      } catch (e) {
+        console.error('Erreur sauvegarde demande documents médiateur', e);
+      }
+      return { dossiers: updated };
+    });
+  },
+
+  validerEtSignerParMediateur: (dossierId: string, mediateurName: string, signatureDataUrl: string, observation: string) => {
+    set((state) => {
+      const nowFormatted = new Date().toISOString().replace('T', ' ').substring(0, 16);
+      let targetDossier: DossierItem | undefined;
+      const updated = state.dossiers.map(dossier => {
+        if (dossier.id === dossierId || dossier.numeroDossier === dossierId) {
+          const actionHistory: DossierActionHistory = {
+            id: 'act-' + Date.now(),
+            date: nowFormatted,
+            auteur: mediateurName,
+            auteurRole: 'Médiateur du Royaume',
+            action: 'SIGNATURE',
+            commentaire: `Validation conforme des pièces et signature de l'acte de médiation officiel. ${observation}`
+          };
+          targetDossier = {
+            ...dossier,
+            statut: "SIGNE",
+            demandeDocumentsMediateur: false,
+            demandeDocumentsSupplementaires: false,
+            remarqueAgent: `✅ Litige résolu favorablement par le Médiateur du Royaume (${mediateurName}) : ${observation}. L'acte officiel a été signé électroniquement et transmis au citoyen.`,
+            acteMediationSigne: true,
+            dateSignatureMediation: nowFormatted,
+            signatureMediationDataUrl: signatureDataUrl,
+            historiqueActions: [...(dossier.historiqueActions || []), actionHistory]
+          };
+          return targetDossier;
+        }
+        return dossier;
+      });
+
+      try {
+        localStorage.setItem('tawsa_dossiers', JSON.stringify(updated));
+      } catch (e) {
+        console.error('Erreur sauvegarde validation médiateur', e);
+      }
+
+      // Enregistrer également dans tawsa_signed_documents pour que le citoyen reçoive l'acte signé
+      if (targetDossier) {
+        try {
+          const signedDocs = JSON.parse(localStorage.getItem("tawsa_signed_documents") || "[]");
+          const docsArray = Array.isArray(signedDocs) ? signedDocs : [];
+          const withoutCurrent = docsArray.filter((d: { id?: string }) => d.id !== (targetDossier as DossierItem).numeroDossier && d.id !== (targetDossier as DossierItem).id);
+
+          const newSignedDoc = {
+            id: (targetDossier as DossierItem).numeroDossier,
+            title: `Acte Officiel de Médiation & Accord d'Autorisation — ${(targetDossier as DossierItem).typeDemande}`,
+            citoyenNom: (targetDossier as DossierItem).citoyenNom,
+            citoyenEmail: "rania.lamsakhar@tawsa.ma",
+            content: [
+              "Royaume du Maroc. Institution du Médiateur du Royaume.",
+              `ACTE DE MÉDIATION ET RÉSOLUTION AMIABLE N° ${(targetDossier as DossierItem).numeroDossier}`,
+              `Objet : ${(targetDossier as DossierItem).typeDemande}`,
+              `Citoyen bénéficiaire : ${(targetDossier as DossierItem).citoyenNom} (CNIE : ${(targetDossier as DossierItem).citoyenCnie})`,
+              `Statut : VALIDÉ, SIGNÉ ET DÉLIVRÉ AVEC FORCE EXÉCUTOIRE.`,
+              `Observation du Médiateur : ${observation}`,
+              `Horodatage TSA : ${new Date().toISOString()} [TSA-MEDIATEUR-ROYAUME-MA-SHA256]`
+            ].join("\n"),
+            signatureDataUrl: signatureDataUrl,
+            sentAt: new Date().toISOString(),
+            agentNom: `${mediateurName} (Institution du Médiateur du Royaume)`
+          };
+
+          localStorage.setItem("tawsa_signed_documents", JSON.stringify([...withoutCurrent, newSignedDoc]));
+          window.dispatchEvent(new Event("storage"));
+        } catch (e) {
+          console.error("Erreur enregistrement acte signé dans tawsa_signed_documents", e);
+        }
+      }
+
+      return { dossiers: updated };
+    });
   }
 }));

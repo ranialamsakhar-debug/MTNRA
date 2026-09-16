@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { StripeCheckoutModal } from "../../components/payment/StripeCheckoutModal";
 import { SignLanguageModal } from "../../components/accessibility/SignLanguageModal";
+import { VoiceAssistantModal } from "../../components/accessibility/VoiceAssistantModal";
 import { useDossierStore, DocumentItem, DossierItem, DEFAULT_AGENT_RECLAMATION } from "../../store/dossierStore";
 import { useAuthStore } from "../../store/authStore";
 import { compressImageIfNeeded } from "../../utils/imageCompressor";
@@ -144,7 +145,10 @@ export function NouvelleReclamationPage() {
   const [isOcrProcessing, setIsOcrProcessing] = useState(false);
   const [inputMethod, setInputMethod] = useState<"TEXT" | "AUDIO" | "SIGNES">("TEXT");
   const [isRecording, setIsRecording] = useState(false);
+  const [isTranscribingAudio, setIsTranscribingAudio] = useState(false);
   const [isLSMModalOpen, setIsLSMModalOpen] = useState(false);
+  const [isVoiceModalOpen, setIsVoiceModalOpen] = useState(false);
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
 
   // IA Text Optimizer State
   const [isOptimizingText, setIsOptimizingText] = useState(false);
@@ -159,6 +163,9 @@ export function NouvelleReclamationPage() {
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const [mediaStream, setMediaStream] = useState<MediaStream | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const recordingTimerRef = useRef<any>(null);
   const recognitionRef = useRef<any>(null);
   const timeoutRef = useRef<any>(null);
   const isRecordingRef = useRef<boolean>(false);
@@ -220,13 +227,24 @@ export function NouvelleReclamationPage() {
   const stopRecording = () => {
     setIsRecording(false);
     isRecordingRef.current = false;
+    if (recordingTimerRef.current) {
+      clearInterval(recordingTimerRef.current);
+      recordingTimerRef.current = null;
+    }
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
+      try {
+        mediaRecorderRef.current.stop();
+      } catch (err) {
+        console.warn("MediaRecorder stop error:", err);
+      }
+    }
     if (mediaStream) {
       mediaStream.getTracks().forEach(track => track.stop());
       setMediaStream(null);
     }
     if (recognitionRef.current) {
       const rec = recognitionRef.current;
-      recognitionRef.current = null; // Effacer avant stop pour bloquer l'auto-redémarrage dans onend
+      recognitionRef.current = null; // Effacer avant stop pour bloquer l'auto-redémarrage
       try { rec.stop(); } catch { /* déjà arrêté */ }
     }
     if (timeoutRef.current) {
@@ -234,109 +252,176 @@ export function NouvelleReclamationPage() {
     }
   };
 
+  const startAudioRecording = async () => {
+    stopRecording();
+    setInputMethod("AUDIO");
+    setRecordingSeconds(0);
+    audioChunksRef.current = [];
+
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      alert("Votre navigateur ne supporte pas l'accès au microphone. Utilisez Chrome, Edge ou Safari.");
+      setIsRecording(false);
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      setMediaStream(stream);
+
+      // Support des différents types MIME audio selon le navigateur
+      let mimeType = "";
+      if (typeof MediaRecorder !== "undefined") {
+        if (MediaRecorder.isTypeSupported("audio/webm;codecs=opus")) {
+          mimeType = "audio/webm;codecs=opus";
+        } else if (MediaRecorder.isTypeSupported("audio/webm")) {
+          mimeType = "audio/webm";
+        } else if (MediaRecorder.isTypeSupported("audio/ogg;codecs=opus")) {
+          mimeType = "audio/ogg;codecs=opus";
+        }
+      }
+
+      const options = mimeType ? { mimeType } : undefined;
+      const recorder = new MediaRecorder(stream, options);
+
+      recorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) {
+          audioChunksRef.current.push(e.data);
+        }
+      };
+
+      recorder.onstop = async () => {
+        if (recordingTimerRef.current) {
+          clearInterval(recordingTimerRef.current);
+          recordingTimerRef.current = null;
+        }
+        stream.getTracks().forEach((track) => track.stop());
+        setMediaStream(null);
+
+        const recordedBlob = new Blob(audioChunksRef.current, {
+          type: recorder.mimeType || "audio/webm",
+        });
+
+        if (recordedBlob.size > 0) {
+          await sendAudioToSTT(recordedBlob);
+        }
+      };
+
+      mediaRecorderRef.current = recorder;
+      recorder.start(250);
+      setIsRecording(true);
+      isRecordingRef.current = true;
+
+      // Compteur de temps d'enregistrement
+      recordingTimerRef.current = setInterval(() => {
+        setRecordingSeconds((prev) => prev + 1);
+      }, 1000);
+
+      // Essai optionnel de reconnaissance vocale en parallèle pour affichage fluide
+      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      if (SpeechRecognition) {
+        try {
+          const rec = new SpeechRecognition();
+          rec.lang = 'fr-FR';
+          rec.continuous = true;
+          rec.interimResults = true;
+          rec.onresult = (evt: any) => {
+            let chunk = '';
+            for (let i = evt.resultIndex; i < evt.results.length; ++i) {
+              if (evt.results[i].isFinal) {
+                chunk += evt.results[i][0].transcript;
+              }
+            }
+            if (chunk.trim()) {
+              setDescription(prev => (prev ? prev + " " : "") + chunk.trim());
+            }
+          };
+          rec.onerror = (e: any) => {
+            console.warn("SpeechRecognition log :", e.error);
+          };
+          recognitionRef.current = rec;
+          rec.start();
+        } catch {
+          // Si SpeechRecognition n'est pas disponible, Whisper STT s'en charge
+        }
+      }
+    } catch (err: any) {
+      console.error("Erreur accès micro :", err);
+      alert("Impossible d'accéder au microphone. Vérifiez que vous avez autorisé l'accès dans les paramètres du navigateur.");
+      setIsRecording(false);
+      isRecordingRef.current = false;
+    }
+  };
+
+  const stopAudioRecording = () => {
+    if (recordingTimerRef.current) {
+      clearInterval(recordingTimerRef.current);
+      recordingTimerRef.current = null;
+    }
+
+    if (recognitionRef.current) {
+      try { recognitionRef.current.stop(); } catch {}
+      recognitionRef.current = null;
+    }
+
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
+      mediaRecorderRef.current.stop();
+    } else {
+      setIsRecording(false);
+      isRecordingRef.current = false;
+    }
+  };
+
+  const sendAudioToSTT = async (blob: Blob) => {
+    setIsTranscribingAudio(true);
+    const formData = new FormData();
+    formData.append("file", blob, "enregistrement_citoyen.webm");
+    formData.append("language", "fr");
+
+    try {
+      const response = await fetch("http://localhost:8003/api/voice/transcribe", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.transcription && data.transcription.trim()) {
+          const text = data.transcription.trim();
+          setDescription((prev) => {
+            if (prev.includes(text)) return prev;
+            return (prev ? prev + " " : "") + text;
+          });
+        }
+      } else {
+        console.warn("Service STT : statut non-200 :", response.status);
+      }
+    } catch (error) {
+      console.error("Erreur d'appel au service STT Whisper :", error);
+    } finally {
+      setIsTranscribingAudio(false);
+      setIsRecording(false);
+      isRecordingRef.current = false;
+    }
+  };
+
   const startRealSimulation = async (method: "AUDIO" | "SIGNES") => {
+    if (method === "AUDIO") {
+      if (isRecording && inputMethod === "AUDIO") {
+        stopAudioRecording();
+      } else {
+        await startAudioRecording();
+      }
+      return;
+    }
+
     stopRecording();
     setInputMethod(method);
     setIsRecording(true);
 
     if (method === "SIGNES") {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-        setMediaStream(stream);
-        timeoutRef.current = setTimeout(() => {
-          setDescription(prev => prev + (prev ? " " : "") + "[Traduction IA Signes] : Demande d'assistance pour document bloqué. Merci.");
-        }, 5000);
-      } catch (err) {
-        console.error("Erreur accès caméra", err);
-        alert("Impossible d'accéder à la caméra. Vérifiez vos permissions dans les paramètres du navigateur.");
-        setIsRecording(false);
-      }
-
-    } else if (method === "AUDIO") {
-      // ── Vérification support microphone ──────────────────────────────
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        alert("Votre navigateur ne supporte pas l'accès au microphone. Utilisez Chrome, Edge ou Safari.");
-        setIsRecording(false);
-        return;
-      }
-
-      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-
-      if (!SpeechRecognition) {
-        // ── Fallback : MediaRecorder → affichage message d'attente ─────
-        try {
-          await navigator.mediaDevices.getUserMedia({ audio: true });
-          setDescription(prev =>
-            prev + (prev ? " " : "") +
-            "[Enregistrement vocal actif — navigateur sans reconnaissance vocale native. Utilisez Chrome ou Edge pour la transcription automatique.]"
-          );
-          timeoutRef.current = setTimeout(() => setIsRecording(false), 8000);
-        } catch {
-          alert("Impossible d'accéder au microphone. Vérifiez que vous avez autorisé l'accès au microphone dans votre navigateur.");
-          setIsRecording(false);
-        }
-        return;
-      }
-
-      // ── Reconnaissance vocale native (Chrome / Edge / Safari) ────────
-      try {
-        // Demander la permission micro explicitement avant de démarrer
-        await navigator.mediaDevices.getUserMedia({ audio: true });
-      } catch {
-        alert("Accès au microphone refusé. Cliquez sur l'icône 🔒 dans la barre d'adresse et autorisez le microphone.");
-        setIsRecording(false);
-        return;
-      }
-
-      try {
-        const recognition = new SpeechRecognition();
-        recognition.lang = 'fr-FR';
-        recognition.interimResults = true;
-        recognition.continuous = true;
-        recognition.maxAlternatives = 1;
-
-        recognition.onresult = (event: any) => {
-          let finalTranscript = '';
-          for (let i = event.resultIndex; i < event.results.length; ++i) {
-            if (event.results[i].isFinal) {
-              finalTranscript += event.results[i][0].transcript;
-            }
-          }
-          if (finalTranscript.trim()) {
-            setDescription(prev => prev + (prev ? " " : "") + finalTranscript.trim());
-          }
-        };
-
-        recognition.onerror = (event: any) => {
-          console.warn("Erreur reconnaissance vocale :", event.error);
-          if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
-            alert("Microphone bloqué par le navigateur. Autorisez l'accès dans les paramètres.");
-            setIsRecording(false);
-          } else if (event.error === 'no-speech') {
-            // Pas de parole détectée — on continue silencieusement
-          } else if (event.error === 'network') {
-            alert("Erreur réseau pendant la reconnaissance vocale. Vérifiez votre connexion internet.");
-            setIsRecording(false);
-          }
-        };
-
-        // Auto-redémarrage si la reconnaissance s'arrête seule (comportement Chrome)
-        recognition.onend = () => {
-          if (recognitionRef.current === recognition && isRecordingRef.current) {
-            try { recognition.start(); } catch { /* déjà arrêté */ }
-          } else {
-            setIsRecording(false);
-          }
-        };
-
-        recognitionRef.current = recognition;
-        recognition.start();
-
-      } catch (err) {
-        console.error("Erreur démarrage STT", err);
-        alert("Impossible de démarrer la reconnaissance vocale. Réessayez ou utilisez la saisie texte.");
-        setIsRecording(false);
-      }
+      stopRecording();
+      setIsLSMModalOpen(true);
+      return;
     }
   };
 
@@ -584,7 +669,18 @@ export function NouvelleReclamationPage() {
             <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
               2. Saisie du Motif & Description :
             </label>
-            <span className="text-[11px] text-slate-500 font-medium">Mode actif : <strong className="text-slate-900">{inputMethod}</strong></span>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setIsVoiceModalOpen(true)}
+                className="text-[11px] text-amber-800 hover:text-amber-900 font-bold underline flex items-center gap-1 cursor-pointer"
+                title="Ouvrir l'assistant avec reconnaissance Whisper et synthèse vocale TTS"
+              >
+                <span>🎙️</span>
+                <span>Assistant Vocal Avancé (STT / TTS)</span>
+              </button>
+              <span className="text-[11px] text-slate-500 font-medium">Mode actif : <strong className="text-slate-900">{inputMethod}</strong></span>
+            </div>
           </div>
 
           {/* Boutons d'Accessibilité Inclusive */}
@@ -610,16 +706,36 @@ export function NouvelleReclamationPage() {
             <button
               type="button"
               onClick={() => startRealSimulation("AUDIO")}
+              disabled={isTranscribingAudio}
               className={`p-3 rounded-xl border font-bold text-xs flex items-center justify-center gap-2 transition cursor-pointer ${
                 inputMethod === "AUDIO"
-                  ? "bg-emerald-700 text-white border-emerald-700 shadow"
+                  ? isRecording
+                    ? "bg-rose-600 text-white border-rose-600 shadow-md animate-pulse"
+                    : isTranscribingAudio
+                    ? "bg-amber-600 text-white border-amber-600 shadow-md"
+                    : "bg-emerald-700 text-white border-emerald-700 shadow"
                   : "bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200"
               }`}
             >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-              </svg>
-              <span>{isRecording && inputMethod === "AUDIO" ? "Écoute en cours..." : "Dictée Vocale"}</span>
+              {isTranscribingAudio ? (
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              ) : isRecording && inputMethod === "AUDIO" ? (
+                <span className="relative flex h-3 w-3">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-3 w-3 bg-white"></span>
+                </span>
+              ) : (
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                </svg>
+              )}
+              <span>
+                {isTranscribingAudio
+                  ? "Transcription en cours..."
+                  : isRecording && inputMethod === "AUDIO"
+                  ? `Arrêter (${recordingSeconds}s) ⏹️`
+                  : "Dictée Vocale (Whisper)"}
+              </span>
             </button>
 
             <button
@@ -633,6 +749,32 @@ export function NouvelleReclamationPage() {
               <span>Langue des Signes</span>
             </button>
           </div>
+
+          {/* État d'enregistrement vocal en cours */}
+          {isRecording && inputMethod === "AUDIO" && (
+            <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl flex items-center justify-between text-xs text-rose-900 shadow-sm">
+              <div className="flex items-center gap-2 font-bold">
+                <span className="w-2.5 h-2.5 rounded-full bg-rose-600 animate-ping" />
+                <span>Microphone en écoute ({recordingSeconds}s)... Parlez pour dicter votre demande.</span>
+              </div>
+              <button
+                type="button"
+                onClick={stopAudioRecording}
+                className="px-3 py-1.5 bg-rose-600 text-white rounded-lg font-bold text-[11px] hover:bg-rose-700 transition flex items-center gap-1 cursor-pointer shadow"
+              >
+                <span>Arrêter & Transcrire</span>
+                <span>⏹️</span>
+              </button>
+            </div>
+          )}
+
+          {/* État de transcription Whisper STT */}
+          {isTranscribingAudio && (
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-center gap-2.5 text-xs text-amber-900 shadow-sm">
+              <div className="w-4 h-4 border-2 border-amber-600 border-t-transparent rounded-full animate-spin" />
+              <span className="font-bold">L'IA Whisper transcrit votre enregistrement audio en haute précision...</span>
+            </div>
+          )}
 
           <textarea
             required
@@ -808,6 +950,18 @@ export function NouvelleReclamationPage() {
         onSelectTranscription={(text) => {
           setDescription(prev => prev ? prev + " " + text : text);
           setInputMethod("TEXT");
+        }}
+      />
+
+      {/* Modal Assistant Vocal Complet (STT & TTS) */}
+      <VoiceAssistantModal
+        isOpen={isVoiceModalOpen}
+        onClose={() => {
+          setIsVoiceModalOpen(false);
+        }}
+        onSelectTranscription={(transcription) => {
+          setDescription(prev => (prev ? prev + " " : "") + transcription);
+          setIsVoiceModalOpen(false);
         }}
       />
 

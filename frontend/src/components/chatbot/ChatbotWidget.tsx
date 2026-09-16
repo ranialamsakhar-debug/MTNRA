@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { useUIStore } from "../../store/uiStore";
 
@@ -63,8 +64,10 @@ const translations: Record<string, any> = {
 };
 
 export function ChatbotWidget({ currentRole = "CITOYEN" }: ChatbotWidgetProps) {
+  const navigate = useNavigate();
   const { lang, isChatOpen: isOpen, toggleChat: setIsOpen } = useUIStore();
   const t = translations[lang] || translations.FR;
+  const [isExpanded, setIsExpanded] = useState(false);
   
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -276,43 +279,69 @@ export function ChatbotWidget({ currentRole = "CITOYEN" }: ChatbotWidgetProps) {
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
             transition={{ duration: 0.2 }}
-            className="fixed bottom-24 right-6 z-50 w-full max-w-md bg-slate-950 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col text-slate-100 h-[560px] font-sans"
+            className={`fixed z-50 bg-white border border-slate-200/90 rounded-2xl shadow-2xl overflow-hidden flex flex-col text-slate-800 font-sans transition-all duration-300 ${
+              isExpanded
+                ? "inset-4 sm:inset-10 max-w-5xl mx-auto h-[calc(100vh-5rem)]"
+                : "bottom-24 right-6 w-full max-w-md h-[580px]"
+            }`}
           >
-            {/* Header Sober */}
-            <div className="px-4 py-3 bg-slate-900 border-b border-slate-800 flex items-center justify-between shadow-sm z-10" dir={lang === "AR" ? "rtl" : "ltr"}>
+            {/* Header Sober Ministériel */}
+            <div className="px-4 py-3.5 bg-slate-900 border-b border-slate-800 flex items-center justify-between shadow-sm z-10 text-white" dir={lang === "AR" ? "rtl" : "ltr"}>
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-slate-800 text-slate-300 border border-slate-700 flex items-center justify-center shrink-0">
-                  <svg className="w-4 h-4 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
+                <div className="w-8 h-8 rounded-lg bg-slate-800 border border-slate-700 text-white flex items-center justify-center text-sm shadow-inner shrink-0">
+                  🏛️
                 </div>
                 <div>
                   <h3 className="font-bold text-sm leading-tight text-white">
                     {t.title}
                   </h3>
-                  <p className="text-[11px] text-slate-400 flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                    <span>Assistant Officiel</span>
+                  <p className="text-[11px] text-slate-300 flex items-center gap-1.5 mt-0.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                    <span>Assistant Officiel (RAG Certifié)</span>
                   </p>
                 </div>
               </div>
-              <button
-                onClick={() => setIsOpen(false)}
-                className="w-7 h-7 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition cursor-pointer text-sm"
-              >
-                ✕
-              </button>
+
+              {/* Boutons d'action : Plein écran, Agrandir, Fermer */}
+              <div className="flex items-center gap-1.5 text-slate-300">
+                <button
+                  onClick={() => {
+                    setIsOpen(false);
+                    navigate("/assistance-ia");
+                  }}
+                  title="Ouvrir dans l'espace plein écran"
+                  className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-300 hover:text-white transition cursor-pointer text-xs flex items-center gap-1 font-semibold"
+                >
+                  <span>↗</span>
+                  <span className="text-[10px] hidden sm:inline">Plein Écran</span>
+                </button>
+
+                <button
+                  onClick={() => setIsExpanded(!isExpanded)}
+                  title={isExpanded ? "Réduire" : "Agrandir la fenêtre"}
+                  className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-300 hover:text-white transition cursor-pointer text-sm"
+                >
+                  {isExpanded ? "❐" : "⛶"}
+                </button>
+
+                <button
+                  onClick={() => setIsOpen(false)}
+                  className="w-7 h-7 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center transition cursor-pointer text-sm"
+                  title="Fermer"
+                >
+                  ✕
+                </button>
+              </div>
             </div>
 
-            {/* Zone des messages (Background with WhatsApp-like color) */}
+            {/* Zone des messages claire et lisible */}
             <div 
-              className="flex-1 p-4 overflow-y-auto flex flex-col gap-2 text-sm relative"
-              style={{ backgroundImage: "url('https://www.transparenttextures.com/patterns/cubes.png')", backgroundColor: "#0b141a", backgroundBlendMode: "overlay" }}
+              className="flex-1 p-4 overflow-y-auto flex flex-col gap-3 text-sm relative bg-slate-50/70"
               dir={lang === "AR" ? "rtl" : "ltr"}
             >
-              {/* WhatsApp Date Header */}
-              <div className="flex justify-center mb-4">
-                <span className="bg-[#182229] text-[#8696a0] text-xs px-3 py-1 rounded-lg uppercase tracking-wide shadow-sm">
+              {/* Date Header */}
+              <div className="flex justify-center mb-2">
+                <span className="bg-slate-200/80 text-slate-600 text-[11px] font-bold px-3 py-0.5 rounded-full uppercase tracking-wider shadow-2xs">
                   {t.today}
                 </span>
               </div>
@@ -325,34 +354,25 @@ export function ChatbotWidget({ currentRole = "CITOYEN" }: ChatbotWidgetProps) {
                     className={`flex flex-col ${isUser ? "items-end" : "items-start"}`}
                   >
                     <div
-                      className={`relative max-w-[85%] px-3 py-2 rounded-lg shadow-sm ${
+                      className={`relative max-w-[85%] px-4 py-3 rounded-2xl shadow-2xs ${
                         isUser
-                          ? "bg-[#005c4b] text-[#e9edef] rounded-tr-none"
-                          : "bg-[#202c33] text-[#e9edef] rounded-tl-none"
+                          ? "bg-slate-900 text-white rounded-tr-xs"
+                          : "bg-white text-slate-900 border border-slate-200/90 rounded-tl-xs"
                       }`}
                     >
-                      {/* Tail element */}
-                      <div className={`absolute top-0 w-3 h-3 ${isUser ? "-right-2 text-[#005c4b]" : "-left-2 text-[#202c33]"}`}>
-                        <svg viewBox="0 0 8 13" width="8" height="13" className="fill-current">
-                          {isUser ? (
-                            <path d="M5.188 1H0v11.193l6.467-8.625C7.526 2.156 6.958 1 5.188 1z" />
-                          ) : (
-                            <path d="M1.533 3.568L8 12.193V1H2.812C1.042 1 .474 2.156 1.533 3.568z" />
-                          )}
-                        </svg>
-                      </div>
-
-                      <div className="text-[14.5px] leading-snug whitespace-pre-line pb-4">
+                      <div className="text-[13.5px] leading-relaxed whitespace-pre-line font-normal">
                         {msg.text}
                       </div>
 
                       {/* Sources et score RAG */}
                       {msg.sources && msg.sources.length > 0 && (
-                        <div className="mt-2 pt-2 border-t border-white/10 space-y-1 pb-4">
-                          <div className="flex items-center justify-between text-[11px] text-[#8696a0]">
-                            <span className="font-semibold text-[#00a884]">📚 Source :</span>
+                        <div className="mt-2.5 pt-2 border-t border-slate-100 space-y-1">
+                          <div className="flex items-center justify-between text-[11px] text-slate-500">
+                            <span className="font-bold text-slate-700 flex items-center gap-1">
+                              <span>📜</span> Source officielle :
+                            </span>
                             {msg.confidence !== undefined && (
-                              <span className="text-[#00a884]">
+                              <span className="font-mono font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
                                 {Math.round(msg.confidence * 100)}%
                               </span>
                             )}
@@ -360,7 +380,7 @@ export function ChatbotWidget({ currentRole = "CITOYEN" }: ChatbotWidgetProps) {
                           {msg.sources.map((s, idx) => (
                             <div
                               key={idx}
-                              className="text-[11px] text-[#8696a0] bg-[#0b141a]/50 px-2 py-1 rounded flex items-center gap-1 truncate"
+                              className="text-[11px] text-slate-600 bg-slate-50 border border-slate-200 px-2 py-0.5 rounded flex items-center gap-1 truncate"
                             >
                               <span>📄</span>
                               <span className="truncate">{s.fichier}</span>
@@ -369,14 +389,10 @@ export function ChatbotWidget({ currentRole = "CITOYEN" }: ChatbotWidgetProps) {
                         </div>
                       )}
 
-                      {/* Horodatage WhatsApp (Bottom Right of Bubble) */}
-                      <div className={`absolute bottom-1 right-2 flex items-center gap-1 text-[10px] ${isUser ? "text-[#85cbb1]" : "text-[#8696a0]"}`}>
+                      {/* Horodatage */}
+                      <div className={`mt-1.5 flex items-center justify-end gap-1 text-[10px] font-mono ${isUser ? "text-slate-400" : "text-slate-400"}`}>
                         <span>{msg.timestamp}</span>
-                        {isUser && (
-                          <svg viewBox="0 0 16 15" width="16" height="15" className="fill-current text-[#53bdeb]">
-                            <path d="M15.01 3.316l-.478-.372a.365.365 0 0 0-.51.063L8.666 9.879a.32.32 0 0 1-.484.033l-.358-.325a.319.319 0 0 0-.484.032l-.378.483a.418.418 0 0 0 .036.541l1.32 1.266c.143.14.361.125.484-.033l6.272-8.048a.366.366 0 0 0-.064-.512zm-4.1 0l-.478-.372a.365.365 0 0 0-.51.063L4.566 9.879a.32.32 0 0 1-.484.033L1.891 7.769a.366.366 0 0 0-.515.006l-.423.433a.364.364 0 0 0 .006.514l3.258 3.185c.143.14.361.125.484-.033l6.272-8.048a.365.365 0 0 0-.063-.51z" />
-                          </svg>
-                        )}
+                        {isUser && <span className="text-emerald-400 font-bold">✓✓</span>}
                       </div>
                     </div>
 
@@ -384,9 +400,11 @@ export function ChatbotWidget({ currentRole = "CITOYEN" }: ChatbotWidgetProps) {
                     {!isUser && (
                       <button
                         onClick={() => speakMessage(msg.id, msg.text)}
-                        className="text-[11px] text-[#8696a0] hover:text-[#00a884] transition cursor-pointer mt-1 ml-1 flex items-center gap-1"
+                        className="text-[11px] text-slate-500 hover:text-slate-900 transition cursor-pointer mt-1 ml-1 flex items-center gap-1 bg-white border border-slate-200 px-2 py-0.5 rounded-md shadow-2xs"
+                        title="Écouter la synthèse vocale"
                       >
-                        {isPlayingAudio === msg.id ? "⏸️" : "🔊"}
+                        <span>{isPlayingAudio === msg.id ? "⏸️" : "🔊"}</span>
+                        <span>{isPlayingAudio === msg.id ? "Pause" : "Écouter"}</span>
                       </button>
                     )}
                   </div>
@@ -394,18 +412,12 @@ export function ChatbotWidget({ currentRole = "CITOYEN" }: ChatbotWidgetProps) {
               })}
 
               {loading && (
-                <div className="flex items-start">
-                  <div className="bg-[#202c33] text-[#e9edef] rounded-lg rounded-tl-none px-4 py-3 shadow-sm relative">
-                    <div className="absolute top-0 -left-2 w-3 h-3 text-[#202c33]">
-                      <svg viewBox="0 0 8 13" width="8" height="13" className="fill-current">
-                        <path d="M1.533 3.568L8 12.193V1H2.812C1.042 1 .474 2.156 1.533 3.568z" />
-                      </svg>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <span className="w-2 h-2 bg-[#8696a0] rounded-full animate-bounce" style={{ animationDelay: "0ms" }}></span>
-                      <span className="w-2 h-2 bg-[#8696a0] rounded-full animate-bounce" style={{ animationDelay: "150ms" }}></span>
-                      <span className="w-2 h-2 bg-[#8696a0] rounded-full animate-bounce" style={{ animationDelay: "300ms" }}></span>
-                    </div>
+                <div className="flex items-start gap-2">
+                  <div className="bg-white border border-slate-200 rounded-2xl rounded-tl-xs px-4 py-3 shadow-2xs flex items-center gap-1.5">
+                    <span className="w-2 h-2 bg-slate-600 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
+                    <span className="w-2 h-2 bg-slate-600 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
+                    <span className="w-2 h-2 bg-slate-600 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+                    <span className="text-xs text-slate-500 font-medium ml-2">Recherche réglementaire...</span>
                   </div>
                 </div>
               )}
@@ -413,14 +425,14 @@ export function ChatbotWidget({ currentRole = "CITOYEN" }: ChatbotWidgetProps) {
               <div ref={messagesEndRef} />
             </div>
 
-            {/* Suggestions rapides (WhatsApp style) */}
+            {/* Suggestions rapides */}
             {messages.length <= 2 && (
-              <div className="px-3 py-2 bg-[#202c33] flex gap-2 overflow-x-auto no-scrollbar border-b border-[#0b141a]">
+              <div className="px-3 py-2 bg-slate-100/90 border-t border-slate-200 flex gap-1.5 overflow-x-auto no-scrollbar">
                 {suggestions.map((sug, i) => (
                   <button
                     key={i}
                     onClick={() => handleSend(sug)}
-                    className="whitespace-nowrap px-3 py-1.5 rounded-full bg-[#2a3942] hover:bg-[#32424c] text-[#d1d7db] text-[13px] transition"
+                    className="whitespace-nowrap px-3 py-1 rounded-full bg-white hover:bg-slate-200 text-slate-700 border border-slate-200 text-xs font-medium transition cursor-pointer shadow-2xs shrink-0"
                   >
                     {sug}
                   </button>
@@ -428,45 +440,37 @@ export function ChatbotWidget({ currentRole = "CITOYEN" }: ChatbotWidgetProps) {
               </div>
             )}
 
-            {/* Zone de saisie WhatsApp Style */}
+            {/* Zone de saisie */}
             <form
               onSubmit={(e) => {
                 e.preventDefault();
                 handleSend();
               }}
-              className="px-3 py-2 bg-[#202c33] flex items-end gap-2"
+              className="p-3 bg-white border-t border-slate-200 flex items-center gap-2"
               dir={lang === "AR" ? "rtl" : "ltr"}
             >
-              <button type="button" className="p-2 text-[#8696a0] hover:text-[#d1d7db] transition flex-shrink-0">
-                😊
-              </button>
-              <button type="button" className="p-2 text-[#8696a0] hover:text-[#d1d7db] transition flex-shrink-0">
-                📎
-              </button>
-              <div className="flex-1 bg-[#2a3942] rounded-lg flex items-center min-h-[40px] px-3">
+              <div className="flex-1 bg-slate-50 border border-slate-200 rounded-xl flex items-center px-3 py-2 focus-within:border-slate-800 focus-within:bg-white focus-within:ring-2 focus-within:ring-slate-900/5 transition">
                 <input
                   type="text"
                   value={inputValue}
                   onChange={(e) => setInputValue(e.target.value)}
                   placeholder={t.placeholder}
-                  className="w-full bg-transparent text-[#e9edef] text-[15px] placeholder:text-[#8696a0] outline-none"
+                  className="w-full bg-transparent text-slate-900 text-xs sm:text-sm placeholder:text-slate-400 outline-none"
                 />
               </div>
-              {inputValue.trim() ? (
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-10 h-10 rounded-full bg-[#00a884] hover:bg-[#00bfa5] text-white flex items-center justify-center flex-shrink-0 transition shadow-sm ml-1"
-                >
-                  <svg viewBox="0 0 24 24" width="20" height="20" className="fill-current transform translate-x-0.5">
-                    <path d="M1.101 21.757L23.8 12.028 1.101 2.3l.011 7.912 13.623 1.816-13.623 1.817-.011 7.912z" />
-                  </svg>
-                </button>
-              ) : (
-                <button type="button" className="p-2 text-[#8696a0] hover:text-[#d1d7db] transition flex-shrink-0 ml-1">
-                  🎙️
-                </button>
-              )}
+
+              <button
+                type="submit"
+                disabled={loading || !inputValue.trim()}
+                className={`px-4 py-2.5 rounded-xl font-bold text-xs flex items-center gap-1.5 transition shadow-sm shrink-0 cursor-pointer ${
+                  inputValue.trim() && !loading
+                    ? "bg-slate-900 hover:bg-slate-800 text-white"
+                    : "bg-slate-200 text-slate-400 cursor-not-allowed"
+                }`}
+              >
+                <span>Envoyer</span>
+                <span>➔</span>
+              </button>
             </form>
           </motion.div>
         )}

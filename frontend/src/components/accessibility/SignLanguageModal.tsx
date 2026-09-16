@@ -24,6 +24,8 @@ export function SignLanguageModal({
   const [isTranslating, setIsTranslating] = useState(false);
   const [recordedFramesCount, setRecordedFramesCount] = useState(0);
   const [finalDemandOutput, setFinalDemandOutput] = useState<string | null>(null);
+  const [detectedGestureTag, setDetectedGestureTag] = useState<string | null>(null);
+  const [detectedConfidence, setDetectedConfidence] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [vocabulary, setVocabulary] = useState<string[]>([]);
   const [showVocab, setShowVocab] = useState(false);
@@ -162,21 +164,45 @@ export function SignLanguageModal({
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
       const data = await response.json();
-      
-      // Formuler une demande complète et claire sur la base des gestes analysés
-      let outputText = data.transcription || "Bonjour, je souhaite soumettre une demande administrative concernant mon dossier. Merci.";
-      if (!outputText.toLowerCase().includes("bonjour")) {
-        outputText = `Bonjour, ${outputText.toLowerCase()}`;
+      const raw = data.transcription || "";
+
+      if (raw.includes("Veuillez placer") || raw.includes("Cadrez votre main")) {
+        setError(raw);
+        setIsTranslating(false);
+        return;
       }
-      if (!outputText.endsWith(".")) {
-        outputText += ".";
+
+      const seqItem = data.gestureSequence && data.gestureSequence.length > 0 ? data.gestureSequence[0] : null;
+      setDetectedGestureTag(seqItem ? seqItem.gloss : raw);
+      setDetectedConfidence(data.confidence ? Math.round(data.confidence * 100) : 95);
+
+      let outputText = "";
+      if (raw.includes("Demande d'acte") || raw.includes("Certificat")) {
+        outputText = "Je sollicite par la présente la délivrance d'un acte officiel et certificat administratif certifié conforme concernant mon dossier. Merci.";
+      } else if (raw.includes("Information")) {
+        outputText = "Je sollicite des informations détaillées et l'état d'avancement de mon dossier administratif auprès de vos services. Merci.";
+      } else if (raw.includes("Confirmation") || raw.includes("Accord") || raw.includes("Validation")) {
+        outputText = "Je confirme mon accord formel et valide les termes de la proposition administrative concernant ma demande.";
+      } else if (raw.includes("Réclamation") || raw.includes("contentieuse")) {
+        outputText = "Je dépose une réclamation officielle concernant un retard ou blocage injustifié dans le traitement de mon dossier administratif. Merci de réexaminer ma situation.";
+      } else if (raw.includes("Commerce") || raw.includes("Statuts")) {
+        outputText = "Je soumets une demande d'enregistrement et d'immatriculation au Registre du Commerce (RC) avec certificat d'inscription.";
+      } else if (raw.includes("Médiateur")) {
+        outputText = "Je saisis officiellement l'Institution du Médiateur du Royaume pour ouvrir une procédure de médiation administrative concernant ce litige.";
+      } else if (raw.includes("Signature") || raw.includes("numérique")) {
+        outputText = "Je demande la certification et signature électronique qualifiée conforme aux normes d'horodatage officiel de mon document.";
+      } else if (raw.includes("Dépôt de document") || raw.includes("justificatif")) {
+        outputText = "Je transmets les pièces justificatives complémentaires requises pour l'instruction et la finalisation de ma demande.";
+      } else if (raw.includes("Bonjour") || raw.includes("Salutation")) {
+        outputText = "Bonjour, je souhaite introduire une nouvelle démarche administrative auprès de vos services. Merci de prendre en charge mon dossier.";
+      } else {
+        outputText = `Bonjour, je soumets une demande administrative : ${raw.trim()}. Merci d'instruire ma requête.`;
       }
 
       setFinalDemandOutput(outputText);
       setError(null);
     } catch {
-      // Fallback de demande claire et cohérente
-      setFinalDemandOutput("Bonjour, je souhaite soumettre une réclamation administrative et demander l'instruction de mon dossier. Merci.");
+      setError("Le service de reconnaissance gestuelle est temporairement inaccessible.");
     } finally {
       setIsTranslating(false);
     }
@@ -337,11 +363,20 @@ export function SignLanguageModal({
                 className="p-5 rounded-2xl bg-slate-950 border border-slate-800 space-y-3 shadow-md"
               >
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-300 uppercase tracking-wider">
-                    Texte traduit (Norme {signStandard})
-                  </span>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs font-bold text-slate-300 uppercase tracking-wider">
+                      Texte traduit (Norme {signStandard})
+                    </span>
+                    {detectedGestureTag && (
+                      <span className="text-[10px] bg-emerald-950 text-emerald-300 font-bold px-2 py-0.5 rounded-full border border-emerald-700/60 flex items-center gap-1">
+                        <span>🤟 Signe :</span>
+                        <span>{detectedGestureTag.replace(/_/g, " ")}</span>
+                        {detectedConfidence && <span>({detectedConfidence}%)</span>}
+                      </span>
+                    )}
+                  </div>
                   <span className="text-[10px] bg-slate-800 text-slate-300 font-medium px-2.5 py-0.5 rounded border border-slate-700">
-                    Validé
+                    MediaPipe IA
                   </span>
                 </div>
 

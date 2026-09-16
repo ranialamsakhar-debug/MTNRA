@@ -17,6 +17,7 @@ interface SignedDocument {
   content: string;
   signatureDataUrl?: string | null;
   sentAt: string;
+  agentNom?: string;
 }
 
 const SIGNED_DOCUMENTS_STORAGE_KEY = "tawsa_signed_documents";
@@ -58,8 +59,10 @@ export function DossiersPage() {
 
   const receivedSignedDocuments = signedDocuments.filter((document) => {
     if (!user) return false;
-    return document.citoyenEmail === user.email ||
+    const matchesUser = document.citoyenEmail === user.email ||
       document.citoyenNom.toLowerCase() === `${user.prenom} ${user.nom}`.toLowerCase();
+    const matchesDossier = dossiers.some(d => d.numeroDossier === document.id || d.id === document.id);
+    return matchesUser || matchesDossier;
   });
 
   // Modale pour l'ajout de pièces complémentaires urgentes sans recréer de réclamation
@@ -69,6 +72,7 @@ export function DossiersPage() {
 
   // Détecter si un dossier nécessite une pièce urgente de manière explicite
   const pendingNotificationDossier = dossiers.find(d => d.demandeDocumentsSupplementaires || d.statut === "EN_ATTENTE_PIECE");
+  const mediatorRequestDossier = dossiers.find(d => d.demandeDocumentsMediateur === true);
 
   const computeSHA256AndDataUrl = async (file: File): Promise<{ hash: string; dataUrl: string }> => {
     let hash = "";
@@ -123,7 +127,7 @@ export function DossiersPage() {
     
     // Mettre à jour le dossier sélectionné si ouvert
     if (selectedDossier && (selectedDossier.id === urgentTargetDossier.id || selectedDossier.numeroDossier === urgentTargetDossier.numeroDossier)) {
-      setSelectedDossier(prev => prev ? { ...prev, demandeDocumentsSupplementaires: false, statut: "EN_COURS", documents: [...prev.documents, ...newDocs] } : null);
+      setSelectedDossier(prev => prev ? { ...prev, demandeDocumentsSupplementaires: false, demandeDocumentsMediateur: false, statut: "EN_COURS", documents: [...prev.documents, ...newDocs] } : null);
     }
   };
 
@@ -138,8 +142,8 @@ export function DossiersPage() {
         >
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
             <div>
-              <span className="text-[10px] uppercase tracking-wider text-amber-300 font-black">Document reçu de l'agent de signature</span>
-              <h2 className="text-lg font-black mt-1">Vos documents signés sont prêts à être lus en signes</h2>
+              <span className="text-[10px] uppercase tracking-wider text-amber-300 font-black">Actes & Décisions Numériques Reçus</span>
+              <h2 className="text-lg font-black mt-1">Vos documents et autorisations signés sont disponibles</h2>
             </div>
             <span className="text-xs font-bold text-slate-300">{receivedSignedDocuments.length} document(s)</span>
           </div>
@@ -151,7 +155,12 @@ export function DossiersPage() {
                     <p className="text-xs font-black text-white">{document.id} — {document.title}</p>
                     {document.signatureDataUrl && (
                       <span className="text-[10px] bg-emerald-500/20 text-emerald-300 font-extrabold px-2 py-0.5 rounded-full border border-emerald-500/30">
-                        ✍️ Signature Manuscrite Inclus
+                        ✍️ Signature Officielle Incluse
+                      </span>
+                    )}
+                    {document.agentNom && (
+                      <span className="text-[10px] bg-teal-500/20 text-teal-300 font-bold px-2 py-0.5 rounded-full border border-teal-500/30">
+                        {document.agentNom}
                       </span>
                     )}
                   </div>
@@ -177,8 +186,52 @@ export function DossiersPage() {
         </motion.section>
       )}
 
+      {/* ALERTE NOTIFICATION PERMANENTE CITOYEN DE DEMANDE DE PIÈCES MÉDIATEUR */}
+      {mediatorRequestDossier && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="p-6 bg-teal-50 border border-teal-200 backdrop-blur-md text-slate-900 rounded-3xl shadow-sm space-y-3 relative overflow-hidden"
+        >
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <span className="w-10 h-10 rounded-2xl bg-teal-100 text-2xl flex items-center justify-center shrink-0">
+                📄
+              </span>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="px-3 py-0.5 rounded-full bg-teal-600 text-white font-extrabold text-[10px] uppercase tracking-wider">
+                    Demande du Médiateur
+                  </span>
+                  <span className="text-xs font-mono font-bold text-teal-900">
+                    {mediatorRequestDossier.numeroDossier}
+                  </span>
+                </div>
+                <h3 className="text-sm font-bold text-slate-900 mt-1">
+                  Le Médiateur a demandé des pièces complémentaires pour votre dossier {mediatorRequestDossier.numeroDossier}
+                </h3>
+              </div>
+            </div>
+
+            <button
+              onClick={() => {
+                setSelectedDossier(mediatorRequestDossier);
+                setUrgentTargetDossier(mediatorRequestDossier);
+              }}
+              className="px-4 py-2.5 bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs rounded-xl shadow transition cursor-pointer flex items-center gap-1.5 shrink-0"
+            >
+              <span>📤</span> <span>Ajouter les Pièces Demandées</span>
+            </button>
+          </div>
+
+          <div className="p-4 bg-white/80 rounded-2xl border border-teal-100 text-xs font-semibold leading-relaxed text-slate-800">
+            💬 <strong>Pièces requises :</strong> {mediatorRequestDossier.documentsDemandesParMediateur?.join(', ')}
+          </div>
+        </motion.div>
+      )}
+
       {/* ALERTE NOTIFICATION PERMANENTE CITOYEN DE DEMANDE DE PIÈCES OU COMMENTAIRE */}
-      {pendingNotificationDossier && (
+      {pendingNotificationDossier && !mediatorRequestDossier && (
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -263,7 +316,7 @@ export function DossiersPage() {
             </thead>
             <tbody className="text-sm divide-y divide-slate-100">
               {dossiers.map((dossier) => {
-                const isUrgentAllowed = Boolean(dossier.demandeDocumentsSupplementaires || dossier.statut === "EN_ATTENTE_PIECE");
+                const isUrgentAllowed = Boolean(dossier.demandeDocumentsSupplementaires || dossier.statut === "EN_ATTENTE_PIECE" || dossier.demandeDocumentsMediateur);
                 return (
                   <tr key={dossier.id} className="hover:bg-indigo-50/30 transition-colors">
                     <td className="py-4 px-6 font-mono font-bold text-slate-900">{dossier.numeroDossier}</td>
@@ -311,7 +364,7 @@ export function DossiersPage() {
                             <span>🔒</span> <span>Ajout Non Requis</span>
                           </button>
                         )}
-                        {receivedSignedDocuments.some((document) => document.id === dossier.numeroDossier || document.id === dossier.id) && (
+                        {(dossier.acteMediationSigne || receivedSignedDocuments.some((document) => document.id === dossier.numeroDossier || document.id === dossier.id)) && (
                           <button
                             onClick={() => setSelectedSheetDossier(dossier)}
                             className="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-xs transition cursor-pointer flex items-center gap-1 shadow-xs"
@@ -411,6 +464,57 @@ export function DossiersPage() {
               </div>
             </div>
 
+            {/* ALERTE REJET */}
+            {selectedDossier.statut === "REJETE" && (
+              <div className="p-5 bg-rose-50 border-2 border-rose-200 rounded-2xl space-y-3 shadow-sm mb-4">
+                {(() => {
+                  const rejectAction = selectedDossier.historiqueActions?.find(a => a.action === 'REJET');
+                  const agentStr = rejectAction ? `${rejectAction.auteur} (${rejectAction.auteurRole})` : '(Agent de Validation)';
+                  return (
+                    <>
+                      <h4 className="text-sm font-black text-rose-900 flex items-center gap-2">
+                        <span>❌</span> <span>Demande refusée par : {agentStr}</span>
+                      </h4>
+                      <div className="p-4 bg-white rounded-xl border border-rose-100">
+                        <span className="text-xs font-bold text-rose-700 uppercase tracking-wider block mb-2">Motif du rejet :</span>
+                        <p className="text-sm font-medium text-slate-900 leading-relaxed">
+                          {selectedDossier.remarqueAgent || "Non spécifié."}
+                        </p>
+                      </div>
+                    </>
+                  );
+                })()}
+              </div>
+            )}
+
+            {/* ALERTE SUCCÈS MÉDIATION & ACTE OFFICIEL SIGNÉ */}
+            {(selectedDossier.acteMediationSigne || (selectedDossier.statut === "SIGNE" && selectedDossier.remarqueAgent?.includes("Médiateur"))) && (
+              <div className="p-5 bg-emerald-50 border-2 border-emerald-300 rounded-2xl space-y-3 shadow-sm mb-4">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-sm font-black text-emerald-900 flex items-center gap-2">
+                    <span>⚖️</span> <span>Litige Résolu par l'Institution du Médiateur du Royaume</span>
+                  </h4>
+                  <span className="text-[10px] bg-emerald-200 text-emerald-900 font-extrabold px-2.5 py-0.5 rounded-full border border-emerald-300">
+                    Acte Signé Exécutoire
+                  </span>
+                </div>
+                <div className="p-3.5 bg-white rounded-xl border border-emerald-200 text-xs space-y-1">
+                  <span className="text-xs font-bold text-emerald-800 uppercase tracking-wider block">Décision & Régularisation :</span>
+                  <p className="text-xs font-medium text-slate-900 leading-relaxed">
+                    {selectedDossier.remarqueAgent}
+                  </p>
+                </div>
+                <div className="flex justify-end pt-1">
+                  <button
+                    onClick={() => setSelectedSheetDossier(selectedDossier)}
+                    className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white font-extrabold text-xs rounded-xl shadow-xs transition cursor-pointer flex items-center gap-1.5"
+                  >
+                    <span>📜</span> Consulter la Feuille d'Autorisation & Signature du Médiateur
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* SECTION CONCRÈTE ET TRANSPARENTE DES COMMENTAIRES ET MOTIFS D'AGENT */}
             <div className="p-5 bg-slate-900 text-slate-100 rounded-2xl space-y-3 border border-slate-800 shadow-md">
               <div className="flex items-center justify-between">
@@ -447,6 +551,32 @@ export function DossiersPage() {
                 </div>
               )}
             </div>
+
+            {/* SECTION MÉDIATEUR : PIÈCES DEMANDÉES */}
+            {selectedDossier.demandeDocumentsMediateur === true && selectedDossier.documentsDemandesParMediateur && selectedDossier.documentsDemandesParMediateur.length > 0 && (
+              <div className="p-5 bg-teal-50 border border-teal-200 rounded-2xl space-y-3 mt-4">
+                <h4 className="text-sm font-black text-teal-900 flex items-center gap-2">
+                  <span>📄</span> <span>Pièces Demandées par le Médiateur</span>
+                </h4>
+                <ul className="list-disc list-inside text-sm text-slate-800 space-y-1 ml-2">
+                  {selectedDossier.documentsDemandesParMediateur.map((doc, idx) => (
+                    <li key={idx} className="font-medium">{doc}</li>
+                  ))}
+                </ul>
+                <div className="pt-2">
+                  <button
+                    onClick={() => {
+                      const current = selectedDossier;
+                      setSelectedDossier(null);
+                      setUrgentTargetDossier(current);
+                    }}
+                    className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs rounded-xl shadow transition cursor-pointer flex items-center gap-1.5"
+                  >
+                    <span>📤</span> <span>Transmettre les pièces au médiateur</span>
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* DESCRIPTION */}
             <div className="space-y-2">
@@ -650,24 +780,27 @@ export function DossiersPage() {
       )}
 
       {/* Feuille de décision officielle & Autorisation signée */}
-      {selectedSheetDossier && receivedSignedDocuments.find((document) =>
+      {selectedSheetDossier && (receivedSignedDocuments.find((document) =>
         document.id === selectedSheetDossier.numeroDossier || document.id === selectedSheetDossier.id
-      ) && (
-        <OfficialPermissionSheet
-          dossierId={selectedSheetDossier.numeroDossier || selectedSheetDossier.id}
-          citoyenNom={selectedSheetDossier.citoyenNom}
-          cni={selectedSheetDossier.citoyenCnie || "AI225"}
-          titre={selectedSheetDossier.typeDemande}
-          dateSignature={new Date(receivedSignedDocuments.find((document) =>
-            document.id === selectedSheetDossier.numeroDossier || document.id === selectedSheetDossier.id
-          )!.sentAt).toLocaleDateString("fr-FR", { year: "numeric", month: "long", day: "numeric" })}
-          signatureDataUrl={receivedSignedDocuments.find((document) =>
-            document.id === selectedSheetDossier.numeroDossier || document.id === selectedSheetDossier.id
-          )!.signatureDataUrl}
-          agentNom="Agent de Signature & Envoi"
-          onClose={() => setSelectedSheetDossier(null)}
-        />
-      )}
+      ) || selectedSheetDossier.acteMediationSigne) && (() => {
+        const matchingDoc = receivedSignedDocuments.find((document) =>
+          document.id === selectedSheetDossier.numeroDossier || document.id === selectedSheetDossier.id
+        );
+        return (
+          <OfficialPermissionSheet
+            dossierId={selectedSheetDossier.numeroDossier || selectedSheetDossier.id}
+            citoyenNom={selectedSheetDossier.citoyenNom}
+            cni={selectedSheetDossier.citoyenCnie || "AI225"}
+            titre={selectedSheetDossier.typeDemande}
+            dateSignature={matchingDoc?.sentAt
+              ? new Date(matchingDoc.sentAt).toLocaleDateString("fr-FR", { year: "numeric", month: "long", day: "numeric" })
+              : (selectedSheetDossier.dateSignatureMediation || new Date().toLocaleDateString("fr-FR", { year: "numeric", month: "long", day: "numeric" }))}
+            signatureDataUrl={matchingDoc?.signatureDataUrl || selectedSheetDossier.signatureMediationDataUrl}
+            agentNom={matchingDoc?.agentNom || (selectedSheetDossier.acteMediationSigne ? "Youssef TAZI (Institution du Médiateur du Royaume)" : "Samira MANSOURI (Agent Signature & Envoi)")}
+            onClose={() => setSelectedSheetDossier(null)}
+          />
+        );
+      })()}
 
       {selectedSignedSheetDocument && (
         <OfficialPermissionSheet
@@ -678,7 +811,7 @@ export function DossiersPage() {
           dateSignature={new Date(selectedSignedSheetDocument.sentAt).toLocaleDateString("fr-FR", { year: "numeric", month: "long", day: "numeric" })}
           tsaTimestamp="2026-09-03T14:30:00Z [TSA-GOV-MA-SHA256]"
           signatureDataUrl={selectedSignedSheetDocument.signatureDataUrl}
-          agentNom="Samira MANSOURI (Agent Signature & Envoi)"
+          agentNom={selectedSignedSheetDocument.agentNom || "Samira MANSOURI (Agent Signature & Envoi)"}
           onClose={() => setSelectedSignedSheetDocument(null)}
         />
       )}

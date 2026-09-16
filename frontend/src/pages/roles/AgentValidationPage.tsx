@@ -5,7 +5,7 @@ import { useDossierStore, DocumentItem, DossierItem } from "../../store/dossierS
 import { UserProfileBanner } from "../../components/common/UserProfileBanner";
 
 export function AgentValidationPage() {
-  const { dossiers: storeDossiers } = useDossierStore();
+  const { dossiers: storeDossiers, updateDossierDecision } = useDossierStore();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [dossiersList, setDossiersList] = useState<DossierItem[]>(storeDossiers);
@@ -58,6 +58,7 @@ export function AgentValidationPage() {
     setDossiersList((prev) =>
       prev.map((d) => (d.id === selectedId ? { ...d, statut: "VALIDE" } : d))
     );
+    updateDossierDecision(selectedId, "VALIDE", "✅ Dossier examiné et validé. Conformité certifiée sans réserve.", "Karim El Idrissi", "Agent Validation");
     showInlineFeedback("validate", `✅ Validé avec succès ! Transmis à la Certification.`);
   };
 
@@ -66,6 +67,7 @@ export function AgentValidationPage() {
     setDossiersList((prev) =>
       prev.map((d) => (d.id === selectedId ? { ...d, statut: "REJETE" } : d))
     );
+    updateDossierDecision(selectedId, "REJETE", rejectReason, "Karim El Idrissi", "Agent Validation");
     showInlineFeedback("reject", `❌ Dossier rejeté. Motif notifié au citoyen.`);
     setShowRejectModal(false);
     setRejectReason("");

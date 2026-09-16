@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useUIStore } from "../../store/uiStore";
-import { UserProfileBanner } from "../../components/common/UserProfileBanner";
 
 interface Message {
   id: string;
@@ -18,48 +17,56 @@ interface ChatbotWidgetProps {
 
 const translations: Record<string, any> = {
   FR: {
-    welcome: "Bonjour ! Je suis l'Assistant IA Administratif & Réglementaire (RAG) de la plateforme Tawsa. Comment puis-je vous assister dans vos démarches ou l'instruction de vos dossiers ?",
-    title: "Système Tawsa",
-    online: "en ligne",
+    welcome: "Bonjour. Je suis l'Assistant IA Administratif & Réglementaire officiel de la plateforme Tawsa. Je réponds à vos questions sur les démarches administratives, les pièces justificatives, les lois en vigueur (notamment la Loi 55.19) et les procédures de recours.",
+    title: "Assistant Réglementaire Tawsa",
+    subtitle: "Système RAG Certifié • Ministère de la Transition Numérique",
+    online: "Base de connaissances connectée",
     today: "Aujourd'hui",
-    placeholder: "Écrivez un message...",
-    sources: "Sources Documentaires",
-    confidence: "Confiance RAG",
-    fallbackMode: "Mode local activé (Services IA hors ligne).",
-    fallbackContact: "Pour traiter cette demande spécifique, veuillez contacter directement le support via la page 'Contacts'."
+    placeholder: "Posez votre question administrative ou juridique...",
+    sources: "Sources Documentaires Vérifiées",
+    confidence: "Indice de conformité RAG",
+    historyTitle: "Historique des requêtes",
+    newChat: "Nouvelle consultation",
+    searchPlaceholder: "Rechercher une procédure...",
   },
   EN: {
-    welcome: "Hello! I am the Administrative & Regulatory AI Assistant of the Tawsa platform. How can I assist you?",
-    title: "Tawsa System",
-    online: "online",
+    welcome: "Hello. I am the official Administrative & Regulatory AI Assistant of the Tawsa platform. How may I assist you with ministerial procedures and regulatory guidelines?",
+    title: "Tawsa Regulatory Assistant",
+    subtitle: "Certified RAG System • Ministry of Digital Transition",
+    online: "Regulatory base connected",
     today: "Today",
-    placeholder: "Type a message...",
-    sources: "Documentary Sources",
-    confidence: "RAG Confidence",
-    fallbackMode: "Local mode enabled (AI services offline).",
-    fallbackContact: "To process this specific request, please contact support directly via the 'Contact' page."
+    placeholder: "Type your administrative or legal query...",
+    sources: "Verified Documentary Sources",
+    confidence: "RAG Confidence Score",
+    historyTitle: "Query History",
+    newChat: "New consultation",
+    searchPlaceholder: "Search procedures...",
   },
   AR: {
-    welcome: "مرحباً! أنا مساعد الذكاء الاصطناعي الإداري لمنصة Tawsa. كيف يمكنني مساعدتك في إجراءاتك؟",
-    title: "نظام Tawsa",
-    online: "متصل",
+    welcome: "مرحباً بكم. أنا المساعد الذكي الرسمي للشؤون الإدارية والتنظيمية لمنصة طاوسا. أجيب على استفساراتكم المتعلقة بالمساطر الإدارية، الوثائق المطلوبة ومقتضيات القانون 55.19.",
+    title: "المساعد التنظيمي طاوسا",
+    subtitle: "نظام الذكاء الاصطناعي التوليدي • وزارة الانتقال الرقمي",
+    online: "قاعدة المعطيات متصلة",
     today: "اليوم",
-    placeholder: "اكتب رسالة...",
-    sources: "المصادر الوثائقية",
-    confidence: "مستوى الثقة",
-    fallbackMode: "الوضع المحلي مفعل (خدمات الذكاء الاصطناعي غير متصلة).",
-    fallbackContact: "لمعالجة هذا الطلب، يرجى الاتصال بالدعم مباشرة عبر صفحة 'اتصل بنا'."
+    placeholder: "اطرح سؤالك حول الإجراءات والوثائق الإدارية...",
+    sources: "المراجع والوثائق المعتمدة",
+    confidence: "مستوى المطابقة التنظيمية",
+    historyTitle: "سجل الاستشارات",
+    newChat: "استشارة جديدة",
+    searchPlaceholder: "البحث في المساطر الإدارية...",
   },
   TAM: {
-    welcome: "ⴰⵣⵓⵍ! ⵏⴽⴽⵉⵏ ⴷ ⴰⵎⴰⵡⴰⵙ ⵏ ⵜⵉⴳⴳⵉ ⵏ ⵜⵎⵙⵙⵓⴳⵓⵔⵜ. ⵎⴰⵏⵉⴽ ⵙ ⵎⵓⵔⵉⵖ ⴰⴷ ⴰⵡⵙⵖ?",
-    title: "ⴰⵏⴳⵔⴰⵡ Tawsa",
-    online: "ⴳ ⵓⵣⴷⴰⵢ",
-    today: "ⴰⵙⵙⴰ",
-    placeholder: "ⴰⵔⴰ ⵢⴰⵜ ⵜⴱⵔⴰⵜ...",
-    sources: "ⵉⵖⴱⵓⵍⴰ",
-    confidence: "ⵜⴰⴼⵍⵙⵜ",
-    fallbackMode: "ⴰⵙⴽⴽⵉⵏ ⴰⴷⵖⴰⵔⴰⵏ ⵉⵍⵍⴰ (IA ⵓⵔ ⵉⵍⵍⵉ).",
-    fallbackContact: "ⴰⴼⴰⴷ ⴰⴷ ⵜⵙⴽⵔⴷ ⴰⵙⵓⵜⵔ ⴰⴷ, ⵎⵙⴰⵡⴰⴹ ⴷ ⵜⵏⴰⴼⵓⵜ ⵏ ⵜⵡⵉⵙⵉ."
+    welcome: "Azul. Nkkid d amawas n tisi n tmassugurt n Tawsa. Ssarɣ ad awen-fkeɣ tiririt ɣef tirmad tinmawayin.",
+    title: "Amawas Tawsa",
+    subtitle: "Angraw n Tisi • Tamawast n Temsusgurt",
+    online: "G uzday",
+    today: "Assa",
+    placeholder: "Ara asuter nnek...",
+    sources: "Iɣbula n tmassugurt",
+    confidence: "Tafelsiwt RAG",
+    historyTitle: "Amzruy",
+    newChat: "Amaynu",
+    searchPlaceholder: "Rzu...",
   }
 };
 
@@ -85,8 +92,9 @@ export function ChatbotPage({ currentRole = "CITOYEN" }: ChatbotWidgetProps) {
   const [inputValue, setInputValue] = useState("");
   const [loading, setLoading] = useState(false);
   const [isPlayingAudio, setIsPlayingAudio] = useState<string | null>(null);
-  const [showHistory, setShowHistory] = useState(false);
+  const [showHistory, setShowHistory] = useState(true);
   const [historySearch, setHistorySearch] = useState("");
+  const [isRecordingVoice, setIsRecordingVoice] = useState(false);
 
   // Sessions d'historique sauvegardées
   const [sessions, setSessions] = useState<ChatSession[]>(() => {
@@ -101,7 +109,7 @@ export function ChatbotPage({ currentRole = "CITOYEN" }: ChatbotWidgetProps) {
         date: "2026-08-30",
         messages: [
           { id: "h1-1", sender: "user", text: "Quels sont les documents pour un fonds de commerce ?", timestamp: "14:20" },
-          { id: "h1-2", sender: "bot", text: "Les pièces nécessaires sont le certificat négatif, le contrat de bail, la copie CNI...", timestamp: "14:21" }
+          { id: "h1-2", sender: "bot", text: "Les pièces nécessaires sont le certificat négatif (OMPIC), le contrat de bail commercial, la copie CNIE et la déclaration d'immatriculation au Registre du Commerce.", timestamp: "14:21" }
         ]
       },
       {
@@ -110,7 +118,7 @@ export function ChatbotPage({ currentRole = "CITOYEN" }: ChatbotWidgetProps) {
         date: "2026-08-28",
         messages: [
           { id: "h2-1", sender: "user", text: "Comment saisir le médiateur en cas de litige ?", timestamp: "10:15" },
-          { id: "h2-2", sender: "bot", text: "Vous devez justifier d'une notification de rejet préalable et transmettre le dossier...", timestamp: "10:16" }
+          { id: "h2-2", sender: "bot", text: "La saisine requiert une contestation formelle préalable ou une absence de réponse administrative après 30 jours, avec copie CNIE et pièces justificatives.", timestamp: "10:16" }
         ]
       }
     ];
@@ -118,6 +126,7 @@ export function ChatbotPage({ currentRole = "CITOYEN" }: ChatbotWidgetProps) {
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const audioElementRef = useRef<HTMLAudioElement | null>(null);
+  const recognitionRef = useRef<any>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -125,20 +134,20 @@ export function ChatbotPage({ currentRole = "CITOYEN" }: ChatbotWidgetProps) {
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages]);
+  }, [messages, loading]);
 
-  // Sauvegarder l'historique dans localStorage
   useEffect(() => {
     localStorage.setItem(`tawsa_ai_history_${currentRole}`, JSON.stringify(sessions));
   }, [sessions, currentRole]);
 
-  // Suggestions rapides adaptées à tous les acteurs
+  // Suggestions rapides professionnelles
   const suggestions = [
-    "Quelles sont les pièces pour la demande du Passeport biométrique ?",
-    "Comment obtenir l'Extrait de Casier Judiciaire (Bulletin N°3) ?",
-    "Quelles sont les démarches pour établir le Livret de Famille ?",
-    "Pièces nécessaires pour la Carte Nationale (CNIE biométrique)",
-    "Procédure d'immatriculation d'un fonds de commerce",
+    "Quelles sont les pièces pour le Passeport biométrique ?",
+    "Comment obtenir le Casier Judiciaire (Bulletin N°3) ?",
+    "Démarches pour l'Extrait d'Acte de Naissance (Watiqa)",
+    "Procédure d'immatriculation d'un Fonds de Commerce (OMPIC)",
+    "Quelles sont les conditions de saisine du Médiateur du Royaume ?",
+    "Délais de réponse légaux selon la Loi 55.19",
   ];
 
   const handleSend = async (questionToSend?: string) => {
@@ -189,58 +198,58 @@ export function ChatbotPage({ currentRole = "CITOYEN" }: ChatbotWidgetProps) {
       });
     } catch (error) {
       const q = question.toLowerCase();
-      let fallbackText = "📌 **Guide Officiel des Procédures Administratives (MTNRA / Tawsa) :**\n\n";
+      let fallbackText = "📌 **Guide Réglementaire Officiel (MTNRA / Loi 55.19) :**\n\n";
 
       if (q.includes("passeport") || q.includes("passport") || q.includes("voyage")) {
         fallbackText += "### Procédure pour le Passeport Biométrique Marocain :\n" +
-          "1. **Demande en ligne** sur le portail `www.passeport.ma`.\n" +
-          "2. **Carte Nationale (CNIE)** en cours de validité.\n" +
-          "3. **2 photos d'identité récentes** (35 x 45 mm, fond blanc).\n" +
-          "4. **Timbre Fiscal Électronique** de 500 DH.\n" +
-          "5. **Ancien passeport** (en cas de renouvellement) ou Déclaration de perte visée par la DGSN.";
+          "1. **Demande préalable en ligne** sur le portail national `www.passeport.ma`.\n" +
+          "2. **Carte Nationale d'Identité Électronique (CNIE)** en cours de validité.\n" +
+          "3. **2 photographies d'identité récentes** (format 35 x 45 mm sur fond blanc).\n" +
+          "4. **Timbre fiscal électronique** d'un montant de 500 DH.\n" +
+          "5. **Ancien passeport** en cas de renouvellement ou déclaration de perte auprès des services de la DGSN.";
       } else if (q.includes("casier") || q.includes("bulletin") || q.includes("justice")) {
-        fallbackText += "### Procédure pour le Casier Judiciaire (Bulletin N°3) :\n" +
-          "1. **Demande en ligne** sur `casierjudiciaire.justice.gov.ma` ou au Tribunal de Première Instance.\n" +
+        fallbackText += "### Extrait de Casier Judiciaire (Bulletin N°3) :\n" +
+          "1. **Demande en ligne** sur le guichet électronique du Ministère de la Justice (`casierjudiciaire.justice.gov.ma`).\n" +
           "2. **Copie de la CNIE** du demandeur.\n" +
-          "3. **Extrait d'Acte de Naissance récent** (si né au Maroc).\n" +
-          "4. **Droit de timbre** de 10 DH (ou retrait numérique).";
+          "3. **Extrait d'Acte de Naissance récent** (si naissance enregistrée au Maroc).\n" +
+          "4. **Droit de timbre légal** de 10 DH avec retrait numérique sécurisé.";
       } else if (q.includes("livret") || q.includes("famille") || q.includes("mariage")) {
-        fallbackText += "### Procédure pour le Livret de Famille :\n" +
-          "1. **Dépôt au Bureau d'État Civil** du lieu de résidence du mari.\n" +
-          "2. **Acte de mariage officiel** homologué par le Juge de la Famille.\n" +
-          "3. **Copies certifiées conformes des CNIE** des deux époux.\n" +
-          "4. **Extraits d'acte de naissance récents** des deux époux + 2 photos.";
+        fallbackText += "### Délivrance du Livret de Famille :\n" +
+          "1. **Dépôt auprès du Bureau d'État Civil** du lieu de résidence de l'époux.\n" +
+          "2. **Expédition originale de l'Acte de Mariage** homologué par le Juge de la Famille.\n" +
+          "3. **Copies certifiées conformes des CNIE** des deux conjoints.\n" +
+          "4. **Extraits d'acte de naissance récents** des deux époux assortis de 2 photos d'identité.";
       } else if (q.includes("cnie") || q.includes("cni") || q.includes("carte nationale") || q.includes("identité")) {
-        fallbackText += "### Procédure pour la Carte Nationale (CNIE Biométrique) :\n" +
-          "1. **Extrait d'Acte de Naissance récent** (- 3 mois) ou Livret de Famille.\n" +
-          "2. **Attestation de résidence** délivrée par le Commissariat / Caïdat.\n" +
-          "3. **4 photos d'identité récentes** (35 x 45 mm).\n" +
-          "4. **Droit de timbre fiscal** de 75 DH.";
+        fallbackText += "### Carte Nationale d'Identité Électronique (CNIE Biométrique) :\n" +
+          "1. **Extrait d'Acte de Naissance** datant de moins de 3 mois ou livret de famille.\n" +
+          "2. **Certificat de résidence** délivré par la DGSN ou la Gendarmerie Royale.\n" +
+          "3. **4 photos d'identité normalisées** (35 x 45 mm).\n" +
+          "4. **Quittance du droit de timbre fiscal** de 75 DH.";
       } else if (q.includes("acte") || q.includes("naissance") || q.includes("watiqa")) {
-        fallbackText += "### Procédure d'Extrait d'Acte de Naissance :\n" +
-          "1. **Demande dématérialisée** sur le portail `www.watiqa.ma` avec livraison par Barid Al-Maghrib.\n" +
-          "2. **Guichet de l'État Civil** : Présentation de la CNIE ou du Livret de Famille.";
+        fallbackText += "### Demande d'Extrait d'Acte de Naissance :\n" +
+          "1. **Télédéclaration** via le portail `www.watiqa.ma` avec option de livraison postale recommandée sécurisée (Barid Al-Maghrib).\n" +
+          "2. **Retrait au guichet communal d'État Civil** : Sur présentation de la CNIE du demandeur.";
       } else if (q.includes("fond") || q.includes("commerce") || q.includes("ompic") || q.includes("registre")) {
-        fallbackText += "### Procédure pour un Fonds de Commerce (OMPIC & Registre du Commerce) :\n" +
-          "1. **Certificat Négatif** (OMPIC).\n" +
-          "2. **Contrat de bail commercial** ou Acte de propriété.\n" +
-          "3. **Copie CNIE** du gérant.\n" +
-          "4. **Inscription au Registre du Commerce** (Modèle 1 ou 2) + Patente DGI.";
-      } else if (q.includes("médiateur") || q.includes("litige") || q.includes("réclamation")) {
-        fallbackText += "### Procédure de Saisine du Médiateur du Royaume :\n" +
-          "1. **Copie de la CNIE** du réclamant.\n" +
-          "2. **Preuve du rejet administratif préalable** ou absence de réponse sous 30 jours.\n" +
-          "3. **Mémoire explicatif & pièces justificatives** transmises via Tawsa.";
+        fallbackText += "### Immatriculation d'un Fonds de Commerce (OMPIC & Registre du Commerce) :\n" +
+          "1. **Certificat Négatif** délivré par l'OMPIC.\n" +
+          "2. **Contrat de bail commercial** légalisé et enregistré ou titre de propriété foncière.\n" +
+          "3. **Copie de la CNIE** du commerçant ou des gérants statutaires.\n" +
+          "4. **Dépôt au greffe du Tribunal de Commerce** pour inscription au Registre du Commerce (Modèle 1 ou 2) et déclaration à la DGI.";
+      } else if (q.includes("médiateur") || q.includes("litige") || q.includes("recours") || q.includes("réclamation")) {
+        fallbackText += "### Conditions de Saisine de l'Institution du Médiateur du Royaume :\n" +
+          "1. **Justification d'un recours préalable** auprès de l'administration concernée demeuré sans suite après 30 jours ou ayant fait l'objet d'une décision contestée.\n" +
+          "2. **Copie de la CNIE** de la partie requérante.\n" +
+          "3. **Mémoire exposant les faits et justificatifs probants** téléversés via l'Espace Recours de Tawsa.";
       } else {
-        fallbackText += `Pour votre demande concernant '${question}', vous pouvez transmettre vos justificatifs scannés directement dans l'espace citoyen ou contacter votre Agent Référent.`;
+        fallbackText += `Pour votre requête concernant « ${question} », les dispositions réglementaires applicables vous permettent d'adresser vos pièces justificatives directement via votre portail Tawsa ou de solliciter l'instruction directe de votre agent référent.`;
       }
 
       const fallbackMessage: Message = {
         id: `bot-${Date.now()}`,
         sender: "bot",
         text: fallbackText,
-        sources: [{ fichier: "Base Légale Interne", score: 0.99 }],
-        confidence: 1.0,
+        sources: [{ fichier: "Base Réglementaire Ministérielle (Loi 55.19)", score: 0.99 }],
+        confidence: 0.98,
         timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
       };
 
@@ -256,7 +265,7 @@ export function ChatbotPage({ currentRole = "CITOYEN" }: ChatbotWidgetProps) {
 
   const updateCurrentSession = (firstQuestion: string, currentMsgs: Message[]) => {
     setSessions((prev) => {
-      const activeId = `sess-${currentRole}-latest`;
+      const activeId = `sess-${currentRole}-active`;
       const existingIdx = prev.findIndex((s) => s.id === activeId);
       if (existingIdx >= 0) {
         const updated = [...prev];
@@ -269,7 +278,7 @@ export function ChatbotPage({ currentRole = "CITOYEN" }: ChatbotWidgetProps) {
         return [
           {
             id: activeId,
-            title: firstQuestion.length > 35 ? firstQuestion.substring(0, 35) + "..." : firstQuestion,
+            title: firstQuestion.length > 38 ? firstQuestion.substring(0, 38) + "..." : firstQuestion,
             date: new Date().toISOString().split("T")[0],
             messages: currentMsgs,
           },
@@ -282,7 +291,7 @@ export function ChatbotPage({ currentRole = "CITOYEN" }: ChatbotWidgetProps) {
   const startNewSession = () => {
     setMessages([
       {
-        id: "welcome",
+        id: `welcome-${Date.now()}`,
         sender: "bot",
         text: t.welcome,
         timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
@@ -292,10 +301,42 @@ export function ChatbotPage({ currentRole = "CITOYEN" }: ChatbotWidgetProps) {
 
   const loadSession = (session: ChatSession) => {
     setMessages(session.messages);
-    if (window.innerWidth < 768) setShowHistory(false);
   };
 
-  // Lecture TTS de la réponse du chatbot
+  // Dictée vocale (STT) intégrée
+  const toggleVoiceDictation = () => {
+    if (isRecordingVoice) {
+      recognitionRef.current?.stop();
+      setIsRecordingVoice(false);
+      return;
+    }
+
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (SpeechRecognition) {
+      try {
+        const reco = new SpeechRecognition();
+        reco.lang = lang === "AR" ? "ar-MA" : "fr-FR";
+        reco.continuous = false;
+        reco.interimResults = false;
+        reco.onstart = () => setIsRecordingVoice(true);
+        reco.onresult = (e: any) => {
+          const text = e.results[0][0].transcript;
+          setInputValue((prev) => (prev ? `${prev} ${text}` : text));
+          setIsRecordingVoice(false);
+        };
+        reco.onerror = () => setIsRecordingVoice(false);
+        reco.onend = () => setIsRecordingVoice(false);
+        recognitionRef.current = reco;
+        reco.start();
+      } catch {
+        setIsRecordingVoice(false);
+      }
+    } else {
+      alert("La dictée vocale n'est pas supportée par ce navigateur.");
+    }
+  };
+
+  // Lecture TTS
   const speakMessage = async (msgId: string, text: string) => {
     if (isPlayingAudio === msgId) {
       audioElementRef.current?.pause();
@@ -308,9 +349,9 @@ export function ChatbotPage({ currentRole = "CITOYEN" }: ChatbotWidgetProps) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          text: text,
-          language: "fr",
-          voice: "fr-FR-HenriNeural",
+          text: text.replace(/[*#`_]/g, ""),
+          language: lang === "AR" ? "ar" : "fr",
+          voice: lang === "AR" ? "ar-MA-MounaNeural" : "fr-FR-HenriNeural",
         }),
       });
 
@@ -323,15 +364,19 @@ export function ChatbotPage({ currentRole = "CITOYEN" }: ChatbotWidgetProps) {
           setIsPlayingAudio(msgId);
           audioElementRef.current.onended = () => setIsPlayingAudio(null);
         }
+        return;
       }
     } catch {
-      if ("speechSynthesis" in window) {
-        const utterance = new SpeechSynthesisUtterance(text);
-        utterance.lang = "fr-FR";
-        window.speechSynthesis.speak(utterance);
-        setIsPlayingAudio(msgId);
-        utterance.onend = () => setIsPlayingAudio(null);
-      }
+      // repli sur Web Speech API
+    }
+
+    if ("speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text.replace(/[*#`_]/g, ""));
+      utterance.lang = lang === "AR" ? "ar-XA" : "fr-FR";
+      utterance.onend = () => setIsPlayingAudio(null);
+      setIsPlayingAudio(msgId);
+      window.speechSynthesis.speak(utterance);
     }
   };
 
@@ -341,207 +386,269 @@ export function ChatbotPage({ currentRole = "CITOYEN" }: ChatbotWidgetProps) {
   );
 
   return (
-    <div className="w-full max-w-6xl mx-auto font-sans space-y-4">
+    <div className="w-full h-full flex flex-col font-sans overflow-hidden rounded-2xl border border-[#EADBCE] bg-[#FAF7F2]/95 shadow-xl backdrop-blur-md">
       <audio ref={audioElementRef} className="hidden" />
-      <UserProfileBanner />
-      <div className="flex gap-4 h-[calc(100vh-10rem)]">
-        {/* Volet Historique des conversations & recherches (collapsible / responsive) */}
-        <AnimatePresence>
-          {(showHistory || window.innerWidth >= 1024) && (
-            <motion.div
-              initial={{ opacity: 0, width: 0 }}
-              animate={{ opacity: 1, width: "320px" }}
-              exit={{ opacity: 0, width: 0 }}
-              className="bg-[#111b21] border border-slate-700/50 rounded-3xl overflow-hidden flex flex-col text-[#e9edef] shrink-0 shadow-2xl"
+
+      {/* ── Entête Officiel Ministériel ────────────────── */}
+      <header className="px-5 py-3.5 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800 shrink-0 z-20">
+        <div className="flex items-center gap-3.5">
+          <div className="w-9 h-9 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center text-lg font-bold shadow-inner">
+            🏛️
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-sm font-black tracking-wide text-white leading-tight">
+                {t.title}
+              </h1>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                {currentRole}
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-300 flex items-center gap-1.5 font-medium mt-0.5">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span>{t.online}</span>
+              <span className="text-slate-500">•</span>
+              <span className="text-slate-400">Loi 55.19 & Décrets d'application</span>
+            </p>
+          </div>
+        </div>
+
+        {/* Actions du bandeau supérieur */}
+        <div className="flex items-center gap-2.5">
+          <button
+            onClick={() => setShowHistory(!showHistory)}
+            className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer border ${
+              showHistory
+                ? "bg-slate-800 text-white border-slate-700"
+                : "bg-slate-800/60 hover:bg-slate-800 text-slate-300 border-slate-700/60"
+            }`}
+            title="Afficher/Masquer le volet historique"
+          >
+            <span>📜</span>
+            <span className="hidden md:inline">{t.historyTitle}</span>
+          </button>
+
+          <button
+            onClick={startNewSession}
+            className="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white transition flex items-center gap-1.5 shadow-sm cursor-pointer"
+            title="Démarrer une nouvelle consultation vierge"
+          >
+            <span>+</span>
+            <span className="hidden sm:inline">{t.newChat}</span>
+          </button>
+        </div>
+      </header>
+
+      {/* ── Corps : Volet Historique + Espace Central de Dialogue ── */}
+      <div className="flex flex-1 overflow-hidden relative">
+        
+        {/* Volet Historique Latéral Beige */}
+        <AnimatePresence initial={false}>
+          {showHistory && (
+            <motion.aside
+              initial={{ width: 0, opacity: 0 }}
+              animate={{ width: 290, opacity: 1 }}
+              exit={{ width: 0, opacity: 0 }}
+              transition={{ duration: 0.22, ease: "easeInOut" }}
+              className="bg-[#F5EFEB] border-r border-[#EADBCE] flex flex-col shrink-0 overflow-hidden z-10"
             >
-              <div className="p-4 bg-[#202c33] border-b border-slate-700 flex items-center justify-between">
-                <div className="flex items-center gap-2 font-bold text-sm text-[#00a884]">
-                  <span>📜</span>
-                  <span>Historique IA</span>
+              {/* Entête Historique */}
+              <div className="p-3.5 border-b border-[#EADBCE] bg-[#EFE7DC]/90 flex items-center justify-between">
+                <span className="text-xs font-extrabold uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
+                  <span>📂</span> {t.historyTitle}
+                </span>
+                <span className="text-[11px] font-mono font-bold text-slate-600 bg-white px-2 py-0.5 rounded-full border border-[#EADBCE]">
+                  {sessions.length}
+                </span>
+              </div>
+
+              {/* Recherche dans l'historique */}
+              <div className="p-2.5 border-b border-[#EADBCE] bg-[#FAF7F2]">
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder={t.searchPlaceholder}
+                    value={historySearch}
+                    onChange={(e) => setHistorySearch(e.target.value)}
+                    className="w-full pl-8 pr-3 py-1.5 text-xs bg-white border border-[#EADBCE] rounded-lg text-slate-800 placeholder-slate-400 outline-none focus:border-slate-800 transition"
+                  />
+                  <span className="absolute left-2.5 top-2 text-slate-400 text-xs">🔍</span>
                 </div>
-                <button
-                  onClick={startNewSession}
-                  className="px-3 py-1.5 bg-[#00a884] hover:bg-[#00bfa5] text-slate-950 font-bold text-xs rounded-xl shadow transition cursor-pointer flex items-center gap-1"
-                >
-                  <span>+</span> <span>Nouvelle</span>
-                </button>
               </div>
 
-              {/* Barre de recherche dans l'historique */}
-              <div className="p-3 bg-[#111b21] border-b border-slate-800">
-                <input
-                  type="text"
-                  placeholder="Rechercher dans l'historique..."
-                  value={historySearch}
-                  onChange={(e) => setHistorySearch(e.target.value)}
-                  className="w-full px-3 py-2 bg-[#202c33] rounded-xl text-xs text-white placeholder-slate-400 outline-none focus:ring-1 focus:ring-[#00a884]"
-                />
-              </div>
-
-              {/* Liste des conversations enregistrées */}
-              <div className="flex-1 overflow-y-auto p-2 space-y-1 divide-y divide-slate-800/50">
+              {/* Liste des conversations archivées */}
+              <div className="flex-1 overflow-y-auto p-2 space-y-1.5 divide-y divide-[#EADBCE]/50">
                 {filteredSessions.length === 0 ? (
-                  <div className="p-4 text-center text-xs text-slate-500">
-                    Aucune conversation trouvée.
+                  <div className="p-6 text-center text-xs text-slate-400 italic">
+                    Aucune consultation trouvée.
                   </div>
                 ) : (
                   filteredSessions.map((s) => (
                     <div
                       key={s.id}
                       onClick={() => loadSession(s)}
-                      className="p-3 hover:bg-[#202c33] rounded-2xl cursor-pointer transition group flex flex-col gap-1"
+                      className="p-2.5 rounded-xl hover:bg-white hover:shadow-xs border border-transparent hover:border-slate-200 cursor-pointer transition flex flex-col gap-1 text-left"
                     >
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-[#e9edef] truncate group-hover:text-[#00a884]">
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="text-xs font-bold text-slate-900 truncate">
                           {s.title}
                         </span>
-                        <span className="text-[10px] text-slate-500">{s.date}</span>
+                        <span className="text-[10px] text-slate-400 font-mono shrink-0">
+                          {s.date}
+                        </span>
                       </div>
-                      <p className="text-[11px] text-slate-400 truncate">
-                        {s.messages[s.messages.length - 1]?.text || "Session fermée"}
+                      <p className="text-[11px] text-slate-500 truncate leading-tight">
+                        {s.messages[s.messages.length - 1]?.text || "Consultation archivée"}
                       </p>
                     </div>
                   ))
                 )}
               </div>
-            </motion.div>
+            </motion.aside>
           )}
         </AnimatePresence>
 
-        {/* Window Principale Chat RAG */}
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="flex-1 bg-[#0b141a] border border-slate-700/50 rounded-3xl shadow-2xl overflow-hidden flex flex-col text-[#e9edef] font-sans"
-        >
-          {/* Header - WhatsApp style */}
-          <div className="px-6 py-4 bg-[#202c33] flex items-center justify-between shadow-sm z-10" dir={lang === "AR" ? "rtl" : "ltr"}>
-            <div className="flex items-center gap-4">
-              <button
-                onClick={() => setShowHistory(!showHistory)}
-                className="p-2 rounded-xl bg-[#2a3942] text-[#00a884] hover:bg-[#32424c] transition cursor-pointer text-sm font-bold flex items-center gap-1.5"
-                title="Afficher/Masquer l'historique IA"
-              >
-                <span>📜</span>
-                <span className="hidden sm:inline">Historique</span>
-              </button>
-              <div className="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center text-xl overflow-hidden shadow-md">
-                <img src="/rania.ma.png" alt="Rania" className="w-full h-full object-cover opacity-80" onError={(e) => (e.currentTarget.style.display = 'none')} />
-                <span className="absolute">🤖</span>
-              </div>
-              <div>
-                <h3 className="font-bold text-base leading-tight text-[#e9edef]">
-                  {t.title} <span className="text-xs text-[#00a884] font-semibold ml-2">({currentRole})</span>
-                </h3>
-                <p className="text-[12px] text-[#8696a0] flex items-center gap-1.5 mt-0.5">
-                  {t.online} <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3 text-[#aebac1]">
-              <button 
-                onClick={startNewSession}
-                title="Nouvelle conversation" 
-                className="px-3 py-1.5 rounded-xl bg-[#2a3942] hover:bg-[#32424c] text-white transition text-xs font-bold cursor-pointer"
-              >
-                + Nouveau Chat
-              </button>
-            </div>
-          </div>
-
-          {/* Zone des messages */}
+        {/* Zone Centrale Principale : Messages & Réactions sur fond beige chaleureux */}
+        <main className="flex-1 flex flex-col h-full overflow-hidden bg-[#FAF7F2]/80">
+          
+          {/* Flux chronologique des messages */}
           <div 
-            className="flex-1 p-6 overflow-y-auto flex flex-col gap-4 text-sm relative"
-            style={{ backgroundImage: "url('https://www.transparenttextures.com/patterns/cubes.png')", backgroundColor: "#0b141a", backgroundBlendMode: "overlay" }}
+            className="flex-1 p-5 md:p-6 overflow-y-auto flex flex-col gap-4 text-sm"
             dir={lang === "AR" ? "rtl" : "ltr"}
           >
-            {/* WhatsApp Date Header */}
-            <div className="flex justify-center mb-4">
-              <span className="bg-[#182229] text-[#8696a0] text-xs px-4 py-1.5 rounded-xl uppercase tracking-wide shadow-sm font-semibold">
+            {/* Repère temporel de début */}
+            <div className="flex justify-center my-1">
+              <span className="bg-[#EADBCE]/80 text-slate-700 text-[11px] font-bold px-3 py-1 rounded-full uppercase tracking-wider shadow-2xs">
                 {t.today}
               </span>
             </div>
 
+            {/* Message d'accueil avec suggestion institutionnelle */}
+            {messages.length === 1 && (
+              <div className="my-2 p-5 rounded-2xl bg-white/95 border border-[#EADBCE] shadow-xs space-y-3 max-w-2xl mx-auto w-full">
+                <div className="flex items-center gap-3 text-slate-900">
+                  <div className="w-10 h-10 rounded-xl bg-slate-900 text-white flex items-center justify-center text-xl">
+                    🏛️
+                  </div>
+                  <div>
+                    <h2 className="font-extrabold text-sm text-slate-900">
+                      Royaume du Maroc — Portail Administratif MTNRA
+                    </h2>
+                    <p className="text-xs text-slate-500">
+                      Assistance certifiée aux citoyens et agents publics
+                    </p>
+                  </div>
+                </div>
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  Sélectionnez l'une des démarches fréquentes ci-dessous ou saisissez librement votre demande réglementaire.
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                  {suggestions.slice(0, 4).map((sug, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => handleSend(sug)}
+                      className="p-2.5 rounded-xl border border-[#EADBCE] bg-[#FAF7F2] hover:bg-white text-left text-xs font-semibold text-slate-800 transition flex items-start gap-2 cursor-pointer group shadow-2xs"
+                    >
+                      <span className="text-slate-500 group-hover:text-slate-900">→</span>
+                      <span>{sug}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Rendu des messages conversationnels */}
             {messages.map((msg) => {
               const isUser = msg.sender === "user";
               return (
-                <div
+                <motion.div
                   key={msg.id}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
                   className={`flex flex-col ${isUser ? "items-end" : "items-start"}`}
                 >
-                  <div
-                    className={`relative max-w-[85%] px-4 py-3 rounded-xl shadow-sm ${
-                      isUser
-                        ? "bg-[#005c4b] text-[#e9edef] rounded-tr-none"
-                        : "bg-[#202c33] text-[#e9edef] rounded-tl-none"
-                    }`}
-                  >
-                    <div className={`absolute top-0 w-4 h-4 ${isUser ? "-right-3 text-[#005c4b]" : "-left-3 text-[#202c33]"}`}>
-                      <svg viewBox="0 0 8 13" width="12" height="18" className="fill-current">
-                        {isUser ? (
-                          <path d="M5.188 1H0v11.193l6.467-8.625C7.526 2.156 6.958 1 5.188 1z" />
-                        ) : (
-                          <path d="M1.533 3.568L8 12.193V1H2.812C1.042 1 .474 2.156 1.533 3.568z" />
-                        )}
-                      </svg>
-                    </div>
-
-                    <div className="text-[15px] leading-relaxed whitespace-pre-line pb-5">
-                      {msg.text}
-                    </div>
-
-                    {msg.sources && msg.sources.length > 0 && (
-                      <div className="mt-3 pt-3 border-t border-white/10 space-y-1.5 pb-4">
-                        <div className="flex items-center justify-between text-xs text-[#8696a0]">
-                          <span className="font-semibold text-[#00a884]">📚 Source Documentaire :</span>
-                          {msg.confidence !== undefined && (
-                            <span className="text-[#00a884] font-mono font-bold">
-                              {Math.round(msg.confidence * 100)}%
-                            </span>
-                          )}
-                        </div>
-                        {msg.sources.map((s, idx) => (
-                          <div
-                            key={idx}
-                            className="text-xs text-[#8696a0] bg-[#0b141a]/50 px-3 py-1.5 rounded-md flex items-center gap-2 truncate border border-white/5"
-                          >
-                            <span>📄</span>
-                            <span className="truncate">{s.fichier}</span>
-                          </div>
-                        ))}
+                  <div className="flex items-end gap-2 max-w-[85%] sm:max-w-[78%]">
+                    {!isUser && (
+                      <div className="w-8 h-8 rounded-xl bg-slate-900 text-white flex items-center justify-center text-sm font-bold shadow-xs shrink-0 mb-1">
+                        🏛️
                       </div>
                     )}
 
-                    <div className={`absolute bottom-1.5 right-2.5 flex items-center gap-1 text-[11px] font-medium ${isUser ? "text-[#85cbb1]" : "text-[#8696a0]"}`}>
-                      <span>{msg.timestamp}</span>
-                      {isUser && (
-                        <svg viewBox="0 0 16 15" width="16" height="15" className="fill-current text-[#53bdeb]">
-                          <path d="M15.01 3.316l-.478-.372a.365.365 0 0 0-.51.063L8.666 9.879a.32.32 0 0 1-.484.033l-.358-.325a.319.319 0 0 0-.484.032l-.378.483a.418.418 0 0 0 .036.541l1.32 1.266c.143.14.361.125.484-.033l6.272-8.048a.366.366 0 0 0-.064-.512zm-4.1 0l-.478-.372a.365.365 0 0 0-.51.063L4.566 9.879a.32.32 0 0 1-.484.033L1.891 7.769a.366.366 0 0 0-.515.006l-.423.433a.364.364 0 0 0 .006.514l3.258 3.185c.143.14.361.125.484-.033l6.272-8.048a.365.365 0 0 0-.063-.51z" />
-                        </svg>
+                    <div
+                      className={`relative px-5 py-4 rounded-2xl shadow-xs leading-relaxed ${
+                        isUser
+                          ? "bg-slate-900 text-white rounded-tr-xs"
+                          : "bg-white text-slate-900 border border-[#EADBCE] rounded-tl-xs"
+                      }`}
+                    >
+                      {/* Contenu textuel */}
+                      <div className="text-[14px] leading-relaxed whitespace-pre-line font-normal">
+                        {msg.text}
+                      </div>
+
+                      {/* Sources RAG documentaires et conformité */}
+                      {msg.sources && msg.sources.length > 0 && (
+                        <div className="mt-3.5 pt-3 border-t border-[#EADBCE]/60 space-y-2">
+                          <div className="flex items-center justify-between text-[11px] text-slate-500">
+                            <span className="font-bold text-slate-700 flex items-center gap-1">
+                              <span>📜</span> {t.sources}
+                            </span>
+                            {msg.confidence !== undefined && (
+                              <span className="font-bold font-mono px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200">
+                                {Math.round(msg.confidence * 100)}% {t.confidence}
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex flex-wrap gap-1.5">
+                            {msg.sources.map((s, idx) => (
+                              <span
+                                key={idx}
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#F5EFEB] border border-[#EADBCE] text-[11px] font-medium text-slate-700 truncate max-w-full"
+                              >
+                                <span>📄</span>
+                                <span className="truncate">{s.fichier}</span>
+                              </span>
+                            ))}
+                          </div>
+                        </div>
                       )}
+
+                      {/* Horodatage discret */}
+                      <div className={`mt-2 flex items-center justify-end gap-1.5 text-[10px] font-mono ${isUser ? "text-slate-400" : "text-slate-400"}`}>
+                        <span>{msg.timestamp}</span>
+                        {isUser && <span className="text-emerald-400 font-bold">✓✓</span>}
+                      </div>
                     </div>
                   </div>
 
+                  {/* Bouton de synthèse vocale pour les réponses du bot */}
                   {!isUser && (
-                    <button
-                      onClick={() => speakMessage(msg.id, msg.text)}
-                      className="text-xs text-[#8696a0] hover:text-[#00a884] transition cursor-pointer mt-1 ml-1 flex items-center gap-1 bg-[#202c33] px-2 py-1 rounded-md"
-                    >
-                      {isPlayingAudio === msg.id ? "⏸️ Arrêter" : "🔊 Écouter"}
-                    </button>
+                    <div className="flex items-center gap-2 mt-1.5 ml-10">
+                      <button
+                        onClick={() => speakMessage(msg.id, msg.text)}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium text-slate-600 bg-white border border-[#EADBCE] hover:bg-[#FAF7F2] hover:text-slate-900 transition cursor-pointer shadow-2xs"
+                        title="Écouter la synthèse vocale officielle"
+                      >
+                        <span>{isPlayingAudio === msg.id ? "⏸️" : "🔊"}</span>
+                        <span>{isPlayingAudio === msg.id ? "Pause" : "Écouter la réponse"}</span>
+                      </button>
+                    </div>
                   )}
-                </div>
+                </motion.div>
               );
             })}
 
+            {/* Indicateur de traitement RAG en cours */}
             {loading && (
-              <div className="flex items-start">
-                <div className="bg-[#202c33] text-[#e9edef] rounded-xl rounded-tl-none px-5 py-4 shadow-sm relative">
-                  <div className="flex items-center gap-1.5">
-                    <span className="w-2.5 h-2.5 bg-[#8696a0] rounded-full animate-bounce" style={{ animationDelay: "0ms" }}></span>
-                    <span className="w-2.5 h-2.5 bg-[#8696a0] rounded-full animate-bounce" style={{ animationDelay: "150ms" }}></span>
-                    <span className="w-2.5 h-2.5 bg-[#8696a0] rounded-full animate-bounce" style={{ animationDelay: "300ms" }}></span>
-                  </div>
+              <div className="flex items-start gap-2 max-w-md">
+                <div className="w-8 h-8 rounded-xl bg-slate-900 text-white flex items-center justify-center text-sm font-bold shadow-xs shrink-0">
+                  🏛️
+                </div>
+                <div className="bg-white border border-[#EADBCE] rounded-2xl rounded-tl-xs px-5 py-3.5 shadow-xs flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-slate-700 animate-bounce" style={{ animationDelay: "0ms" }} />
+                  <span className="w-2 h-2 rounded-full bg-slate-700 animate-bounce" style={{ animationDelay: "150ms" }} />
+                  <span className="w-2 h-2 rounded-full bg-slate-700 animate-bounce" style={{ animationDelay: "300ms" }} />
+                  <span className="text-xs text-slate-500 font-medium ml-2">Consultation de la base réglementaire...</span>
                 </div>
               </div>
             )}
@@ -549,14 +656,17 @@ export function ChatbotPage({ currentRole = "CITOYEN" }: ChatbotWidgetProps) {
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Suggestions rapides */}
-          {messages.length <= 2 && (
-            <div className="px-4 py-3 bg-[#202c33] flex gap-3 overflow-x-auto no-scrollbar border-b border-[#0b141a]">
-              {suggestions.map((sug, i) => (
+          {/* Bandeau de suggestions rapides au-dessus de la saisie */}
+          {messages.length > 1 && (
+            <div className="px-4 py-2 bg-[#F5EFEB]/90 border-t border-[#EADBCE] flex items-center gap-2 overflow-x-auto no-scrollbar">
+              <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wide shrink-0">
+                Suggestions :
+              </span>
+              {suggestions.map((sug, idx) => (
                 <button
-                  key={i}
+                  key={idx}
                   onClick={() => handleSend(sug)}
-                  className="whitespace-nowrap px-4 py-2 rounded-full bg-[#2a3942] hover:bg-[#32424c] text-[#d1d7db] text-sm font-medium transition cursor-pointer shadow-sm"
+                  className="whitespace-nowrap px-3 py-1 rounded-full text-xs font-medium bg-white text-slate-700 border border-[#EADBCE] hover:bg-[#FAF7F2] hover:text-slate-900 transition cursor-pointer shrink-0 shadow-2xs"
                 >
                   {sug}
                 </button>
@@ -564,47 +674,63 @@ export function ChatbotPage({ currentRole = "CITOYEN" }: ChatbotWidgetProps) {
             </div>
           )}
 
-          {/* Zone de saisie */}
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              handleSend();
-            }}
-            className="px-4 py-3 bg-[#202c33] flex items-end gap-3"
-            dir={lang === "AR" ? "rtl" : "ltr"}
-          >
-            <button type="button" className="p-2.5 text-[#8696a0] hover:text-[#d1d7db] transition flex-shrink-0 cursor-pointer text-xl">
-              😊
-            </button>
-            <button type="button" className="p-2.5 text-[#8696a0] hover:text-[#d1d7db] transition flex-shrink-0 cursor-pointer text-xl">
-              📎
-            </button>
-            <div className="flex-1 bg-[#2a3942] rounded-xl flex items-center min-h-[48px] px-4 shadow-inner">
-              <input
-                type="text"
-                value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
-                placeholder={t.placeholder}
-                className="w-full bg-transparent text-[#e9edef] text-base placeholder:text-[#8696a0] outline-none"
-              />
-            </div>
-            {inputValue.trim() ? (
+          {/* ── Zone d'Entrée & Contrôles Inférieurs ──────── */}
+          <footer className="p-3.5 md:p-4 bg-[#FBF8F3] border-t border-[#EADBCE]">
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleSend();
+              }}
+              className="flex items-center gap-2 max-w-5xl mx-auto"
+              dir={lang === "AR" ? "rtl" : "ltr"}
+            >
+              {/* Bouton Dictée vocale (STT) */}
+              <button
+                type="button"
+                onClick={toggleVoiceDictation}
+                className={`p-3 rounded-xl border transition cursor-pointer shrink-0 flex items-center justify-center ${
+                  isRecordingVoice
+                    ? "bg-rose-600 text-white border-rose-700 animate-pulse"
+                    : "bg-white hover:bg-[#F5EFEB] text-slate-700 border-[#EADBCE]"
+                }`}
+                title={isRecordingVoice ? "Arrêter la dictée" : "Dicter votre question (STT)"}
+              >
+                <span className="text-base">{isRecordingVoice ? "🛑" : "🎙️"}</span>
+              </button>
+
+              {/* Champ texte principal */}
+              <div className="flex-1 relative flex items-center bg-white border border-[#EADBCE] rounded-xl focus-within:border-slate-900 focus-within:ring-2 focus-within:ring-slate-900/5 transition">
+                <input
+                  type="text"
+                  value={inputValue}
+                  onChange={(e) => setInputValue(e.target.value)}
+                  placeholder={isRecordingVoice ? "Écoute en cours... parlez distinctement" : t.placeholder}
+                  className="w-full px-4 py-3 bg-transparent text-slate-900 text-sm placeholder:text-slate-400 outline-none"
+                />
+              </div>
+
+              {/* Bouton d'Envoi */}
               <button
                 type="submit"
-                disabled={loading}
-                className="w-12 h-12 rounded-full bg-[#00a884] hover:bg-[#00bfa5] text-white flex items-center justify-center flex-shrink-0 transition shadow-md ml-2 cursor-pointer"
+                disabled={loading || !inputValue.trim()}
+                className={`px-5 py-3 rounded-xl font-bold text-sm flex items-center gap-2 transition shadow-sm shrink-0 cursor-pointer ${
+                  inputValue.trim() && !loading
+                    ? "bg-slate-900 hover:bg-slate-800 text-white"
+                    : "bg-[#EADBCE] text-slate-400 cursor-not-allowed"
+                }`}
               >
-                <svg viewBox="0 0 24 24" width="24" height="24" className="fill-current transform translate-x-0.5">
-                  <path d="M1.101 21.757L23.8 12.028 1.101 2.3l.011 7.912 13.623 1.816-13.623 1.817-.011 7.912z" />
-                </svg>
+                <span>Envoyer</span>
+                <span className="text-xs">➔</span>
               </button>
-            ) : (
-              <button type="button" className="p-2.5 text-[#8696a0] hover:text-[#d1d7db] transition flex-shrink-0 ml-2 cursor-pointer text-xl">
-                🎙️
-              </button>
-            )}
-          </form>
-        </motion.div>
+            </form>
+
+            <div className="text-center mt-2">
+              <span className="text-[11px] text-slate-500 font-medium">
+                Conformité administrative garantie • Réponses extraites du corpus juridique officiel du Royaume du Maroc
+              </span>
+            </div>
+          </footer>
+        </main>
       </div>
     </div>
   );

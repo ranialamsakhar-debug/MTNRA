@@ -17,13 +17,20 @@ import urllib.request
 
 import cv2
 import numpy as np
-import torch
+try:
+    import torch
+    from models.lsm_model import LSMResNetBiLSTMCTC, load_lsm_model
+    from services.ctc_decoder import CTCDecoder, NUM_CLASSES, LSM_VOCABULARY
+except ImportError:
+    torch = None
+    LSMResNetBiLSTMCTC = None
+    load_lsm_model = None
+    CTCDecoder = None
+    NUM_CLASSES = 15
+    LSM_VOCABULARY = []
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-
-from models.lsm_model import LSMResNetBiLSTMCTC, load_lsm_model
-from services.ctc_decoder import CTCDecoder, NUM_CLASSES, LSM_VOCABULARY
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("lsm-service")
@@ -179,8 +186,7 @@ class VocabularyResponse(BaseModel):
 
 def classify_hand_gesture_geometric(landmarks: np.ndarray, standard: str = "UNIVERSEL") -> Tuple[str, float, List[Tuple[str, int, float]]]:
     """
-    Analyse géométrique Euclidienne de haute précision (échelle invariante).
-    Mesure la distance relative des 5 doigts par rapport au poignet et à la paume.
+    Analyse géométrique Euclidienne invariante par comparaison relative des articulations.
     """
     if landmarks is None or not np.any(landmarks > 0):
         return ("Veuillez placer votre main dans le cadre", 0.0, [])
@@ -189,85 +195,117 @@ def classify_hand_gesture_geometric(landmarks: np.ndarray, standard: str = "UNIV
     wrist = pts[0]
     middle_mcp = pts[9]
 
-    # Distance de référence (taille de la paume) pour neutraliser la distance caméra
     ref_len = np.linalg.norm(middle_mcp - wrist)
     if ref_len < 0.001:
         return ("Cadrez votre main face à la caméra", 0.0, [])
 
-    # Distances normalisées des extrémités des 5 doigts
-    d_thumb = np.linalg.norm(pts[4] - wrist) / ref_len
-    d_index = np.linalg.norm(pts[8] - wrist) / ref_len
-    d_middle = np.linalg.norm(pts[12] - wrist) / ref_len
-    d_ring = np.linalg.norm(pts[16] - wrist) / ref_len
-    d_pinky = np.linalg.norm(pts[20] - wrist) / ref_len
-
-    # Seuil d'extension des doigts
-    index_open = d_index > 1.30
-    middle_open = d_middle > 1.30
-    ring_open = d_ring > 1.25
-    pinky_open = d_pinky > 1.20
-    thumb_open = d_thumb > 1.10
+    # Détection précise de l'extension de chaque doigt par rapport à son articulation
+    thumb_open = np.linalg.norm(pts[4] - wrist) > np.linalg.norm(pts[2] - wrist) * 1.15
+    index_open = np.linalg.norm(pts[8] - wrist) > np.linalg.norm(pts[6] - wrist) * 1.10
+    middle_open = np.linalg.norm(pts[12] - wrist) > np.linalg.norm(pts[10] - wrist) * 1.10
+    ring_open = np.linalg.norm(pts[16] - wrist) > np.linalg.norm(pts[14] - wrist) * 1.10
+    pinky_open = np.linalg.norm(pts[20] - wrist) > np.linalg.norm(pts[18] - wrist) * 1.10
 
     std_key = (standard or "UNIVERSEL").upper()
 
-    # 1. POUCE LEVÉ SEUL (Pouce haut, autres doigts repliés)
-    if thumb_open and not index_open and not middle_open and not ring_open:
+    # 1. SIGNE V / DEUX DOIGTS (Index + Majeur levés)
+    if index_open and middle_open and not ring_open and not pinky_open and not thumb_open:
+        labels = {
+            "LSF": "Demande d'acte officiel (LSF)",
+            "ASL": "Official Certificate Request (ASL)",
+            "LSM": "Demande d'acte / Certificat administratif (LSM)",
+            "UNIVERSEL": "Demande d'acte ou certificat"
+        }
+        return (labels.get(std_key, "Demande d'acte ou certificat"), 0.98, [("Signe_V_DeuxDoigts", 1, 0.98)])
+
+    # 2. POUCE LEVÉ SEUL (Pouce haut, doigts fermés)
+    if thumb_open and not index_open and not middle_open and not ring_open and not pinky_open:
         labels = {
             "LSF": "D'accord / Validation (LSF)",
             "ASL": "Agreement / Approved (ASL)",
-            "LSM": "Confirmation / D'accord (LSM)",
+            "LSM": "Confirmation / Accord et validation (LSM)",
             "UNIVERSEL": "Confirmation / Accord"
         }
         return (labels.get(std_key, "Confirmation / Accord"), 0.98, [("Pouce_Levé", 1, 0.98)])
 
-    # 2. INDEX LEVÉ SEUL (Pointage / Information)
-    if index_open and not middle_open and not ring_open and not pinky_open:
+    # 3. INDEX LEVÉ SEUL (Pointage / Question)
+    if index_open and not middle_open and not ring_open and not pinky_open and not thumb_open:
         labels = {
             "LSF": "Demande d'information (LSF)",
             "ASL": "Information request (ASL)",
-            "LSM": "Demande d'information (LSM)",
+            "LSM": "Demande d'information sur un dossier (LSM)",
             "UNIVERSEL": "Demande d'information"
         }
         return (labels.get(std_key, "Demande d'information"), 0.97, [("Index_Pointé", 1, 0.97)])
 
-    # 3. MAIN ENTIÈREMENT OUVERTE (5 doigts écartés)
+    # 4. SIGNE W / 3 DOIGTS (Index + Majeur + Annulaire)
+    if index_open and middle_open and ring_open and not pinky_open:
+        labels = {
+            "LSF": "Réclamation contentieuse (LSF)",
+            "ASL": "Administrative Complaint (ASL)",
+            "LSM": "Dépôt d'une réclamation officielle (LSM)",
+            "UNIVERSEL": "Réclamation administrative"
+        }
+        return (labels.get(std_key, "Réclamation administrative"), 0.96, [("Trois_Doigts_Reclamation", 1, 0.96)])
+
+    # 5. SIGNE "L" (Pouce + Index)
+    if thumb_open and index_open and not middle_open and not ring_open and not pinky_open:
+        labels = {
+            "LSF": "Fonds de commerce & Statuts (LSF)",
+            "ASL": "Business & Commercial Registry (ASL)",
+            "LSM": "Immatriculation Registre de Commerce (LSM)",
+            "UNIVERSEL": "Registre de Commerce"
+        }
+        return (labels.get(std_key, "Registre de Commerce"), 0.97, [("Signe_L_Commerce", 1, 0.97)])
+
+    # 6. AURICULAIRE SEUL (Petit doigt / Saisine)
+    if pinky_open and not index_open and not middle_open and not ring_open and not thumb_open:
+        labels = {
+            "LSF": "Saisine du Médiateur (LSF)",
+            "ASL": "Ombudsman Appeal (ASL)",
+            "LSM": "Recours auprès du Médiateur du Royaume (LSM)",
+            "UNIVERSEL": "Recours Médiateur"
+        }
+        return (labels.get(std_key, "Recours Médiateur"), 0.96, [("Auriculaire_Mediateur", 1, 0.96)])
+
+    # 7. CORNES / ILY (Index + Auriculaire)
+    if index_open and pinky_open and not middle_open and not ring_open:
+        labels = {
+            "LSF": "Signature électronique (LSF)",
+            "ASL": "Digital Signature (ASL)",
+            "LSM": "Signature et certification numérique (LSM)",
+            "UNIVERSEL": "Signature électronique"
+        }
+        return (labels.get(std_key, "Signature électronique"), 0.95, [("Signe_Signature_Electronique", 1, 0.95)])
+
+    # 8. MAIN OUVERTE (5 doigts écartés)
     if index_open and middle_open and ring_open and pinky_open:
         labels = {
-            "LSF": "Bonjour (LSF)",
+            "LSF": "Bonjour / Salutation (LSF)",
             "ASL": "Hello / Greetings (ASL)",
-            "LSM": "Bonjour / Expression naturelle (LSM)",
+            "LSM": "Bonjour / Salutation et prise de contact (LSM)",
             "UNIVERSEL": "Bonjour / Salutation"
         }
         return (labels.get(std_key, "Bonjour / Salutation"), 0.99, [("Main_Ouverte_5Doigts", 1, 0.99)])
 
-    # 4. SIGNE V / DEUX DOIGTS (Index + Majeur levés)
-    if index_open and middle_open and not ring_open and not pinky_open:
+    # 9. POING FERMÉ (Tous repliés)
+    if not index_open and not middle_open and not ring_open and not pinky_open and not thumb_open:
         labels = {
-            "LSF": "Demande d'acte officiel (LSF)",
-            "ASL": "Official Certificate Request (ASL)",
-            "LSM": "Demande d'acte / Certificat (LSM)",
-            "UNIVERSEL": "Demande d'acte ou certificat"
+            "LSF": "Dépôt de pièce justificative (LSF)",
+            "ASL": "Document attachment (ASL)",
+            "LSM": "Dépôt de document justificatif (LSM)",
+            "UNIVERSEL": "Dépôt de document"
         }
-        return (labels.get(std_key, "Demande d'acte ou certificat"), 0.96, [("Signe_V_DeuxDoigts", 1, 0.96)])
+        return (labels.get(std_key, "Dépôt de document"), 0.95, [("Main_Fermée_Poing", 1, 0.95)])
 
-    # 5. POING FERMÉ / MAINS JOINIES (Tous les doigts repliés)
-    if not index_open and not middle_open and not ring_open and not pinky_open:
-        labels = {
-            "LSF": "Demande de document (LSF)",
-            "ASL": "Request for document (ASL)",
-            "LSM": "Demande de document (LSM)",
-            "UNIVERSEL": "Demande de document / Justificatif"
-        }
-        return (labels.get(std_key, "Demande de document / Justificatif"), 0.95, [("Main_Fermée_Poing", 1, 0.95)])
-
-    # 6. GESTE EXPLICATIF (3 doigts levés ou position souple)
+    # 10. GESTE DESCRIPTIF (Autre)
     labels = {
-        "LSF": "Expliquer mon problème (LSF)",
-        "ASL": "Explain issue (ASL)",
-        "LSM": "Expliquer mon problème (LSM)",
+        "LSF": "Explication de la situation (LSF)",
+        "ASL": "Case description (ASL)",
+        "LSM": "Explication de ma situation administrative (LSM)",
         "UNIVERSEL": "Explication de la situation"
     }
-    return (labels.get(std_key, "Explication de la situation"), 0.92, [("Geste_Explicatif", 1, 0.92)])
+    return (labels.get(std_key, "Explication de la situation"), 0.91, [("Geste_Descriptif", 1, 0.91)])
 
 
 @app.on_event("startup")
@@ -313,7 +351,7 @@ async def recognize_frames(payload: FramePayload):
             standardUsed=standard,
         )
 
-    # 1. Tenter l'extraction de landmarks via MediaPipe
+    # 1. Extraction de landmarks via MediaPipe sur toutes les frames
     landmarks_list = []
     landmarker = get_landmarker()
     if landmarker:
@@ -326,24 +364,39 @@ async def recognize_frames(payload: FramePayload):
     else:
         landmarks_list = [np.zeros(225, dtype=np.float32)] * len(frames_bgr)
 
-    # Obtenir la frame avec les landmarks les plus significatifs
-    best_lm = None
+    # 2. Vote temporel sur toutes les frames où la main a été détectée
+    recognized_votes = {}
+    detected_count = 0
+
     for lm in landmarks_list:
         if np.any(lm > 0):
-            best_lm = lm
-            break
+            detected_count += 1
+            trans, conf, seq = classify_hand_gesture_geometric(lm, standard=standard)
+            if trans not in recognized_votes:
+                recognized_votes[trans] = {"count": 0, "conf": conf, "seq": seq}
+            recognized_votes[trans]["count"] += 1
+            if conf > recognized_votes[trans]["conf"]:
+                recognized_votes[trans]["conf"] = conf
+                recognized_votes[trans]["seq"] = seq
 
-    # 2. Classification selon la norme sélectionnée (LSM / LSF / ASL / UNIVERSEL)
-    transcription, confidence, seq = classify_hand_gesture_geometric(best_lm, standard=standard)
+    if not recognized_votes or detected_count == 0:
+        transcription = "Veuillez placer votre main bien en face de la caméra"
+        confidence = 0.50
+        seq_out = []
+    else:
+        best_trans = max(recognized_votes.keys(), key=lambda k: (recognized_votes[k]["count"], recognized_votes[k]["conf"]))
+        transcription = best_trans
+        confidence = recognized_votes[best_trans]["conf"]
+        seq_out = recognized_votes[best_trans]["seq"]
+
     elapsed = round(time.time() - start_time, 3)
-
-    logger.info(f"✅ Geste reconnu [{standard}] : « {transcription} » ({confidence:.0%})")
+    logger.info(f"✅ Geste reconnu [{standard}] : « {transcription} » ({confidence:.0%}) après vote sur {detected_count} frames")
 
     return SignRecognitionResponse(
         transcription=transcription,
         confidence=confidence,
         gestureSequence=[
-            GestureItem(gloss=g[0], frame=g[1], confidence=g[2]) for g in seq
+            GestureItem(gloss=g[0], frame=g[1], confidence=g[2]) for g in seq_out
         ],
         processingTime=elapsed,
         standardUsed=standard,

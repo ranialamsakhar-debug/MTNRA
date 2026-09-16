@@ -165,7 +165,7 @@ export function Sidebar() {
 
   return (
     <aside 
-      className="h-full min-h-screen relative p-5 border-r border-slate-200 flex flex-col justify-between shadow-lg bg-cover bg-left-top bg-no-repeat"
+      className="h-full min-h-screen relative p-5 border-r border-slate-200/80 flex flex-col justify-between shadow-lg bg-cover bg-left-top bg-no-repeat selection:bg-slate-900 selection:text-white"
       style={{ backgroundImage: "url('/sidebar.png')" }}
     >
       <div className="relative z-10">
